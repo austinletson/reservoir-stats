@@ -1,0 +1,284 @@
+/* Reservoir Stats — layout and components.
+ *
+ * Ported from the design handoff's prototype. Values here are load-bearing; see
+ * docs/UI.md and the handoff's 02-DESIGN-SYSTEM.md before changing any of them.
+ * Colour and surface values are NOT here — they are all in tokens.css.
+ */
+
+* { box-sizing: border-box }
+
+body {
+  margin: 0;
+  background: var(--plane);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* 24px gutters, 14px below 860px — see the breakpoints at the bottom. */
+.wrap { max-width: 1240px; margin: 0 auto; padding: 20px 24px 40px }
+
+header.top { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; padding: 6px 0 2px }
+header.top h1 { font-size: 19px; font-weight: 650; margin: 0; letter-spacing: -0.01em }
+header.top .sub { color: var(--muted); font-size: 13px }
+/* Underlined, not just coloured: at 13px on a muted ink, colour alone is not a
+   reliable affordance, and it would be the only place in the page where it is. */
+header.top .sub a { color: var(--ink2); text-decoration: underline;
+  text-decoration-color: var(--axis); text-underline-offset: 2px }
+header.top .sub a:hover { color: var(--ink); text-decoration-color: var(--ink2) }
+header.top .spacer { flex: 1 }
+
+button, select, input { font: inherit; color: inherit }
+:focus-visible { outline: 2px solid var(--c-mathlib); outline-offset: 2px; border-radius: 6px }
+.btn { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 11px; cursor: pointer }
+.btn:hover { background: var(--ghost) }
+
+.tabs {
+  display: flex; gap: 2px; margin: 16px 0 0; padding: 3px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+}
+.tabs button {
+  border: 0; background: transparent; border-radius: 7px; padding: 7px 15px;
+  cursor: pointer; color: var(--ink2); font-weight: 500;
+}
+.tabs button[aria-selected="true"] { background: var(--ghost); color: var(--ink); font-weight: 600 }
+
+/* One filter row, above everything, scoping every view below it. Never a filter
+   inside a card — see 05-INTERACTION-SPEC.md § Scope. */
+.filters {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 0 8px;
+  padding: 11px 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+}
+.filters label { color: var(--ink2); font-size: 12.5px; margin-right: 2px }
+.filters select,
+.filters input[type=search] { background: transparent; border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px }
+.filters input[type=range] { width: 190px; accent-color: var(--c-mathlib) }
+.vr { width: 1px; height: 22px; background: var(--border); margin: 0 2px }
+
+.chips { display: flex; gap: 5px; flex-wrap: wrap }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+  background: transparent; border-radius: 999px; padding: 4px 11px 4px 8px;
+  cursor: pointer; font-size: 12.5px; color: var(--ink2);
+}
+.chip[aria-pressed="true"] { background: var(--ghost); color: var(--ink); font-weight: 550 }
+.chip.cls[aria-pressed="false"] { opacity: .45 }
+.chip.gchip[aria-pressed="true"] { border-color: var(--ink2) }
+.chip .sw { width: 10px; height: 10px; border-radius: 3px; flex: none }
+
+/* The app's contract with the reader about whether the numbers can be trusted. */
+.scopebar { color: var(--muted); font-size: 12.5px; margin: 0 0 16px; padding: 0 4px }
+.scopebar b { color: var(--ink2); font-weight: 600 }
+
+.autolist {
+  position: absolute; z-index: 50; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 8px 26px rgba(0, 0, 0, .16);
+  max-height: 280px; overflow: auto; min-width: 260px; padding: 4px;
+}
+.autolist button {
+  display: block; width: 100%; text-align: left; border: 0; background: transparent;
+  border-radius: 7px; padding: 6px 9px; cursor: pointer; font-size: 12.5px;
+}
+.autolist button:hover, .autolist button:focus { background: var(--ghost) }
+.autolist .o { color: var(--muted) }
+
+/* Every grid child needs min-width:0, or a wide table refuses to shrink and pushes
+   horizontal overflow onto the whole page. This actually happened: 178px at 390px. */
+.grid { display: grid; gap: 14px; align-items: start }
+.grid > * { min-width: 0 }
+.g-2 { grid-template-columns: 1.15fr .85fr }
+.g-11 { grid-template-columns: 1fr 1fr }
+.g-1 { grid-template-columns: 1fr }
+
+.card {
+  min-width: 0; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px 18px;
+}
+.card h3 { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.005em }
+.card .cap { color: var(--muted); font-size: 12.5px; margin: 3px 0 0 }
+.cardhead { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; flex-wrap: wrap }
+.cardhead .spacer { flex: 1 }
+
+.seg { display: inline-flex; background: var(--plane); border: 1px solid var(--border); border-radius: 8px; padding: 2px }
+.seg button {
+  border: 0; background: transparent; border-radius: 6px; padding: 4px 10px;
+  font-size: 12px; cursor: pointer; color: var(--muted);
+}
+.seg button[aria-pressed="true"] {
+  background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .06);
+}
+
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px }
+.kpis > * { min-width: 0 }
+.kpi .lab { color: var(--ink2); font-size: 12.5px }
+/* Proportional figures: tabular-nums on a large standalone number makes 121 look loose. */
+.kpi .val { font-size: 26px; font-weight: 620; letter-spacing: -0.02em; margin-top: 2px }
+.kpi.hero .val { font-size: 44px; line-height: 1.05; font-weight: 640 }
+.kpi .sub { color: var(--muted); font-size: 12px; margin-top: 1px }
+.delta { color: var(--good); font-weight: 600 }
+.delta.down { color: var(--crit) }
+
+/* A runaway leader gets its own row so the remaining ranks keep the full axis. */
+.callout {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; padding: 10px 12px;
+  margin-bottom: 12px; background: var(--plane); border: 1px solid var(--border);
+  border-radius: 10px; cursor: pointer; text-align: left;
+}
+.callout .nm { font-weight: 640 }
+.callout .big { font-size: 20px; font-weight: 640; font-variant-numeric: tabular-nums }
+.callout .why { color: var(--muted); font-size: 12.5px }
+
+.legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px }
+.legend .it { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink2) }
+.legend .sw { width: 11px; height: 11px; border-radius: 3px; flex: none }
+.legend .n { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums }
+
+/* tabular-nums only in columns that align vertically: table cells and axis ticks. */
+table.tv { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 12px }
+table.tv th, table.tv td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid) }
+table.tv th { color: var(--muted); font-weight: 600 }
+table.tv td.num, table.tv th.num { text-align: right; font-variant-numeric: tabular-nums }
+table.tv tbody tr:hover, table.tv tbody tr:focus { background: var(--ghost); outline: none }
+table.tv tbody tr:focus-visible { box-shadow: inset 0 0 0 2px var(--c-mathlib) }
+table.tv thead th { position: sticky; top: 0; background: var(--surface); z-index: 1 }
+
+.hidden { display: none !important }
+.empty { color: var(--muted); padding: 26px 4px; text-align: center }
+
+svg { display: block; overflow: visible }
+.gl { stroke: var(--grid); stroke-width: 1 }   /* solid hairline, never dashed */
+.ax { stroke: var(--axis); stroke-width: 1 }
+.tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums }
+.dlab { fill: var(--ink); font-size: 11.5px; font-weight: 600 }
+.dlab.inv { fill: #fff }
+.rowlab { fill: var(--ink2); font-size: 12px }
+
+/* Tooltips enhance, never gate: every value here is also reachable in a table. */
+.tip {
+  position: fixed; pointer-events: none; z-index: 60; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .16); font-size: 12.5px; max-width: 290px;
+  opacity: 0; transition: opacity .08s;
+}
+.tip .t { color: var(--muted); font-size: 11.5px; margin-bottom: 4px }
+.tip .r { display: flex; align-items: center; gap: 7px; margin-top: 3px }
+.tip .r .k { width: 12px; height: 2px; border-radius: 2px; flex: none }
+.tip .r .v { font-weight: 650; font-variant-numeric: tabular-nums }
+.tip .r .n { color: var(--ink2) }
+
+/* The detail panel docks and pushes the page aside on a wide viewport, rather than
+ * floating over it behind a scrim. That matters for the graph: the whole point of the
+ * panel is to read a package while still seeing and clicking its neighbours, and an
+ * overlay that dims and inerts the page makes that impossible.
+ *
+ * Below the docking breakpoint there is not room to push, so it reverts to an overlay and
+ * becomes modal again. drawer.js follows that split for aria-modal and inert.
+ */
+:root { --drawer-w: 440px }
+
+body { transition: padding-right .18s ease }
+
+@media (min-width: 1000px) {
+  body.drawer-docked { padding-right: var(--drawer-w) }
+  /* No scrim when docked: nothing is being blocked. */
+  body.drawer-docked .scrim { display: none }
+}
+
+#drawer {
+  position: fixed; top: 0; right: 0; height: 100vh; width: var(--drawer-w); max-width: 94vw;
+  background: var(--surface); border-left: 1px solid var(--border);
+  box-shadow: -14px 0 40px rgba(0, 0, 0, .14); z-index: 80;
+  transform: translateX(100%); visibility: hidden;
+  transition: transform .18s ease, visibility .18s ease; overflow-y: auto; padding: 20px;
+}
+#drawer.open { transform: none; visibility: visible }
+#drawer h2 { margin: 0; font-size: 17px; font-weight: 640; letter-spacing: -0.01em; word-break: break-word; padding-right: 70px }
+#drawer h2:focus { outline: none }
+#drawer .owner { color: var(--muted); font-size: 13px }
+#drawer a { color: var(--c-mathlib) }
+.badge {
+  display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px 10px; font-size: 12px; color: var(--ink2);
+}
+.badge .sw { width: 9px; height: 9px; border-radius: 3px }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font-size: 12.5px; margin-top: 12px }
+.facts dt { color: var(--muted) }
+.facts dd { margin: 0; word-break: break-word }
+.dsec { margin-top: 20px }
+.dsec h4 {
+  margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.pill {
+  display: inline-block; border: 1px solid var(--border); border-radius: 8px;
+  padding: 4px 9px; margin: 0 5px 5px 0; font-size: 12.5px; cursor: pointer; background: transparent;
+}
+.pill:hover { background: var(--ghost) }
+.closex { position: absolute; top: 16px; right: 16px }
+.scrim {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .28); z-index: 70;
+  opacity: 0; pointer-events: none; transition: opacity .18s;
+}
+.scrim.on { opacity: 1; pointer-events: auto }
+
+/* ---------- graph ---------- */
+/* Canvas, not SVG: 800 nodes with hover hit-testing is the wrong workload for the DOM. */
+#graphwrap {
+  position: relative; border-radius: 14px; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border);
+}
+#gcanvas { display: block; width: 100%; height: 520px; cursor: grab; outline-offset: -3px }
+#gcanvas.drag { cursor: grabbing }
+.gtools {
+  position: absolute; top: 12px; left: 12px; display: flex; gap: 8px; flex-wrap: wrap;
+  align-items: center; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 7px 9px;
+}
+.glegend {
+  position: absolute; right: 12px; bottom: 12px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px;
+}
+.gnote {
+  position: absolute; left: 12px; bottom: 12px; color: var(--muted); font-size: 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 5px 9px; max-width: 62%;
+}
+#graphNarrow { display: none }
+
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
+
+/* Boot and error states. The data is fetched, so both are real states, not hypotheticals. */
+#boot { color: var(--muted); padding: 60px 4px; text-align: center }
+#boot.err { color: var(--crit) }
+/* Hold the previous render at reduced opacity on refetch — no skeleton flash. */
+.stale { opacity: .45; transition: opacity .15s }
+
+footer.foot {
+  margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: 12.5px;
+}
+footer.foot a { color: var(--c-mathlib) }
+footer.foot ul { margin: 8px 0 0; padding-left: 18px }
+footer.foot li { margin-top: 3px }
+
+@media (max-width: 1020px) { .kpis { grid-template-columns: repeat(2, 1fr) } }
+@media (max-width: 860px) {
+  .g-2, .g-11 { grid-template-columns: 1fr }
+  .kpis { grid-template-columns: repeat(2, 1fr) }
+  .wrap { padding: 16px 14px 40px }
+}
+@media (max-width: 700px) {
+  #graphwrap { display: none }
+  #graphNarrow { display: block }
+  .kpi.hero .val { font-size: 36px }
+}
+
+/* The accessibility spec requires respecting this. Its stated reason is skipping the
+ * graph's force-simulation animation, which this build has no graph to run — but the
+ * drawer slide, the scrim fade and the tooltip fade are the same contract, so they go
+ * too. Nothing here is load-bearing: every transition is cosmetic, and removing them
+ * leaves the same end states. */
+@media (prefers-reduced-motion: reduce) {
+  #drawer, .scrim, .tip, .stale, body { transition: none }
+}

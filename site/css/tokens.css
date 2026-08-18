@@ -1,0 +1,116 @@
+/* Reservoir Atlas design tokens.
+ *
+ * Dark values are declared under BOTH the media query and the [data-theme] scope so an
+ * explicit toggle beats the OS setting in both directions. The :where(:not(...)) guard
+ * lets a light stamp win over OS-dark; :where() keeps the media block's specificity at
+ * zero so the toggle scope always wins.
+ *
+ * See 02-DESIGN-SYSTEM.md before changing any categorical value — the ordering of
+ * --c-mathlib / --c-plus / --c-other is a validated colorblind-safety property, not a
+ * style choice.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --plane:   #f9f9f7;   /* page background */
+  --surface: #fcfcfb;   /* card + chart surface */
+
+  /* ink */
+  --ink:     #0b0b0b;   /* primary text */
+  --ink2:    #52514e;   /* secondary text */
+  --muted:   #898781;   /* axis labels, captions */
+  --neutral: #52514e;   /* quantity marks: ranking bars, single-series lines */
+
+  /* chrome */
+  --grid:   #e1e0d9;               /* gridline hairline */
+  --axis:   #c3c2b7;               /* baseline / axis rule */
+  --border: rgba(11,11,11,0.10);   /* card + control borders */
+  --ghost:  rgba(11,11,11,0.05);   /* hover wash, pressed state */
+
+  /* dependency classes — FIXED ORDER, see 02-DESIGN-SYSTEM.md */
+  --c-mathlib: #2a78d6;   /* requires Mathlib only */
+  --c-plus:    #eb6834;   /* requires Mathlib + others */
+  --c-other:   #1baf7a;   /* requires other packages, not Mathlib */
+  --c-none:    #898781;   /* requires nothing */
+
+  /* sequential ramp (blue), for magnitude encodings such as the toolchain-lag heatmap */
+  --seq-1: #cde2fb;
+  --seq-2: #9ec5f4;
+  --seq-3: #6da7ec;
+  --seq-4: #3987e5;
+  --seq-5: #256abf;
+  --seq-6: #184f95;
+  --seq-7: #0d366b;
+
+  /* status — reserved, never reused as a series color, always paired with text */
+  --good: #0ca30c;
+  --crit: #d03b3b;
+  --warn: #fab219;
+
+  /* type */
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* geometry */
+  --radius-card: 14px;
+  --radius-ctrl: 8px;
+  --radius-pill: 999px;
+  --gap-grid: 14px;
+  --page-max: 1240px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --plane:   #0d0d0d;
+    --surface: #1a1a19;
+    --ink:     #ffffff;
+    --ink2:    #c3c2b7;
+    --muted:   #898781;
+    --neutral: #c3c2b7;
+    --grid:    #2c2c2a;
+    --axis:    #383835;
+    --border:  rgba(255,255,255,0.10);
+    --ghost:   rgba(255,255,255,0.06);
+    --c-mathlib: #3987e5;
+    --c-plus:    #d95926;
+    --c-other:   #199e70;
+    --c-none:    #898781;
+    --seq-1: #184f95;
+    --seq-2: #256abf;
+    --seq-3: #2a78d6;
+    --seq-4: #3987e5;
+    --seq-5: #86b6ef;
+    --seq-6: #b7d3f6;
+    --seq-7: #cde2fb;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --plane:   #0d0d0d;
+  --surface: #1a1a19;
+  --ink:     #ffffff;
+  --ink2:    #c3c2b7;
+  --muted:   #898781;
+  --neutral: #c3c2b7;
+  --grid:    #2c2c2a;
+  --axis:    #383835;
+  --border:  rgba(255,255,255,0.10);
+  --ghost:   rgba(255,255,255,0.06);
+  --c-mathlib: #3987e5;
+  --c-plus:    #d95926;
+  --c-other:   #199e70;
+  --c-none:    #898781;
+  --seq-1: #184f95;
+  --seq-2: #256abf;
+  --seq-3: #2a78d6;
+  --seq-4: #3987e5;
+  --seq-5: #86b6ef;
+  --seq-6: #b7d3f6;
+  --seq-7: #cde2fb;
+}
+
+/* Canvas drawing must re-read these after a theme change. A canvas that caches its
+   colors at first paint will silently stay light. */

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reservoir Stats — the Lean 4 package ecosystem</title>
+<meta name="description" content="Dependency statistics for every package on Reservoir, the Lean 4 package registry: what the ecosystem is built on, how it is composed, and how it is growing.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 16 L27 8 M16 16 L26 25' stroke='%23898781' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='8' fill='%232a78d6'/%3E%3Ccircle cx='27' cy='8' r='4' fill='%23eb6834'/%3E%3Ccircle cx='26' cy='25' r='3.5' fill='%231baf7a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Reservoir Stats</h1>
+    <span class="sub">Dependency statistics for the
+      <a href="https://lean-lang.org">Lean&nbsp;4</a> package ecosystem, as indexed by
+      <a href="https://reservoir.lean-lang.org">Reservoir</a></span>
+    <span class="spacer"></span>
+    <button class="btn" id="themeBtn" type="button">Dark</button>
+  </header>
+
+  <div id="boot">Loading the registry…</div>
+
+  <div id="app" class="hidden">
+    <div class="tabs" role="tablist" aria-label="Views">
+      <button role="tab" id="tab-overview" aria-selected="true" aria-controls="view-overview">Overview</button>
+      <button role="tab" id="tab-graph" aria-selected="false" aria-controls="view-graph">Graph</button>
+      <button role="tab" id="tab-table" aria-selected="false" aria-controls="view-table">All packages</button>
+    </div>
+
+    <!-- One filter row for the whole app. It scopes every view below it. -->
+    <div class="filters">
+      <label for="asof">As of</label>
+      <input type="range" id="asof" min="0" step="1" aria-describedby="asofLab">
+      <span id="asofLab" style="font-variant-numeric:tabular-nums;font-weight:600;min-width:56px"></span>
+      <span class="vr"></span>
+      <label for="minstars">Min stars</label>
+      <select id="minstars">
+        <option value="0">any</option><option value="5">5+</option>
+        <option value="25">25+</option><option value="100">100+</option>
+      </select>
+      <span class="vr"></span>
+      <div class="chips" id="clschips"></div>
+      <span class="vr"></span>
+      <button class="chip gchip" id="collapseMathlib" aria-pressed="false" type="button"
+        title="Drop Mathlib from the ranking and the graph so everything else gets the full scale. It has roughly 7x the dependents of the next package. Counts are not affected.">Collapse Mathlib</button>
+      <span class="vr"></span>
+      <span style="position:relative">
+        <input type="search" id="find" placeholder="Jump to a package…" aria-label="Jump to a package"
+          autocomplete="off" role="combobox" aria-expanded="false" aria-controls="findList" aria-autocomplete="list">
+      </span>
+    </div>
+    <p class="scopebar" id="scopebar"></p>
+
+    <!-- ============ OVERVIEW ============ -->
+    <section id="view-overview" role="tabpanel" aria-labelledby="tab-overview" tabindex="-1">
+      <div class="kpis">
+        <div class="card kpi hero"><div class="lab">Packages</div><div class="val" id="kPkgs">—</div><div class="sub" id="kPkgsSub"></div></div>
+        <div class="card kpi"><div class="lab">Dependency edges</div><div class="val" id="kEdges">—</div><div class="sub" id="kEdgesSub"></div></div>
+        <div class="card kpi"><div class="lab">Depend on Mathlib</div><div class="val" id="kMathlib">—</div><div class="sub" id="kMathlibSub"></div></div>
+        <div class="card kpi"><div class="lab">Require nothing</div><div class="val" id="kNone">—</div><div class="sub" id="kNoneSub"></div></div>
+      </div>
+
+      <div class="grid g-2" style="margin-top:14px">
+        <div class="card">
+          <div class="cardhead">
+            <div>
+              <h3>What packages require</h3>
+              <p class="cap">Every package falls in exactly one class, by what it lists in <code>require</code>.</p>
+            </div>
+            <div class="spacer"></div>
+            <div class="seg" id="compForm" role="group" aria-label="Composition chart form">
+              <button data-f="bar" aria-pressed="true">Bar</button>
+              <button data-f="donut" aria-pressed="false">Donut</button>
+              <button data-f="table" aria-pressed="false">Table</button>
+            </div>
+          </div>
+          <div id="compChart" style="overflow-x:auto"></div>
+          <div id="compSummary" style="margin-top:12px;font-size:13px;line-height:1.6"></div>
+          <div class="legend" id="compLegend"></div>
+        </div>
+
+        <div class="card">
+          <div class="cardhead">
+            <div>
+              <h3>Mix over time</h3>
+              <p class="cap">Share of the ecosystem in each class, month by month, up to the selected date.</p>
+            </div>
+            <div class="spacer"></div>
+            <div class="seg" id="mixForm" role="group" aria-label="Mix chart form">
+              <button data-f="chart" aria-pressed="true">Chart</button><button data-f="table" aria-pressed="false">Table</button>
+            </div>
+          </div>
+          <div id="mixChart"></div>
+          <div class="legend" id="mixLegend"></div>
+        </div>
+      </div>
+
+      <div class="grid g-1" style="margin-top:14px">
+        <div class="card">
+          <div class="cardhead">
+            <div>
+              <h3 id="topTitle">Most depended-on packages</h3>
+              <p class="cap" id="topCap"></p>
+            </div>
+            <div class="spacer"></div>
+            <div class="seg" id="topMetric" role="group" aria-label="Ranking metric">
+              <button data-m="used" aria-pressed="true">Most used</button>
+              <button data-m="growth" aria-pressed="false">Fastest growing</button>
+            </div>
+            <div class="seg" id="topForm" role="group" aria-label="Ranking form">
+              <button data-f="bar" aria-pressed="true">Chart</button><button data-f="table" aria-pressed="false">Table</button>
+            </div>
+          </div>
+          <div id="topCallout"></div>
+          <div id="topChart" style="overflow-x:auto"></div>
+        </div>
+      </div>
+
+      <div class="grid g-11" style="margin-top:14px">
+        <div class="card">
+          <div class="cardhead"><div><h3>Ecosystem size</h3>
+            <p class="cap">Packages in scope, cumulative. The registry opened with 213 packages at once — see the note below.</p></div></div>
+          <div id="ecoN"></div>
+        </div>
+        <div class="card">
+          <div class="cardhead"><div><h3>Dependency edges</h3>
+            <p class="cap">Total <code>require</code> edges. A separate chart, not a second axis.</p></div></div>
+          <div id="ecoE"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ GRAPH ============ -->
+    <section id="view-graph" class="hidden" role="tabpanel" aria-labelledby="tab-graph" tabindex="-1">
+      <div id="graphwrap">
+        <canvas id="gcanvas" tabindex="0" role="application"
+          aria-label="Dependency graph. Use left and right arrow keys to step through the largest hubs, Enter to open a package."></canvas>
+        <div class="gtools">
+          <div class="seg" id="graphMode" role="group" aria-label="Graph mode">
+            <button data-g="focus" aria-pressed="true"
+              title="One package at a time: what depends on it above, what it requires below, arrows pointing at what is required.">One package</button>
+            <button data-g="all" aria-pressed="false"
+              title="Every package at once. Shows that the ecosystem is a star around Mathlib, but most nodes carry no size information.">Everything</button>
+          </div>
+          <span id="allOnlyTools" style="display:flex;gap:8px;align-items:center">
+            <button class="chip gchip" id="hideOrphans" aria-pressed="true" type="button"
+              title="Packages with no edges in the current view form a meaningless ring of confetti around the graph. Hidden by default.">Hide packages with no edges</button>
+            <button class="btn" id="relayout" type="button" style="padding:4px 10px;font-size:12.5px">Re-layout</button>
+          </span>
+          <span id="focusHint" style="color:var(--muted);font-size:12px">Click any package to centre it</span>
+        </div>
+        <div class="glegend" id="graphLegend"></div>
+        <div class="gnote" id="graphNote"></div>
+      </div>
+      <div id="graphNarrow" class="card"><h3>The graph needs a wider screen</h3>
+        <p class="cap">A force layout of this many nodes is unreadable below about 700px.
+          Use <b>All packages</b> for the same data as a sortable table.</p></div>
+      <p class="cap" style="color:var(--muted);margin-top:10px">
+        Node area is proportional to how many packages depend on it; fill says what the package itself
+        requires (hollow = requires nothing). Arrows point at what is required, so lower is more
+        foundational. Dashed marks are groups of packages collapsed into one; click to open them.
+        Click any package to centre the view on it. Drag to pan, scroll to zoom.
+      </p>
+      <p class="cap" style="color:var(--muted);margin-top:6px">
+        <b>Why one package at a time is the default.</b> 82% of packages have nothing depending on them,
+        the median package has none, and Mathlib alone accounts for 47% of every dependency edge. Drawn
+        all at once that is roughly fifteen packages carrying structure and five hundred carrying none,
+        which is a picture of one fact rather than a tool. Per-package the data is well behaved: 99% of
+        packages have twelve or fewer neighbours.
+      </p>
+    </section>
+
+    <!-- ============ ALL PACKAGES ============ -->
+    <section id="view-table" class="hidden" role="tabpanel" aria-labelledby="tab-table" tabindex="-1">
+      <div class="card">
+        <div class="cardhead"><div><h3>All packages in scope</h3>
+          <p class="cap">Every value in the dashboard is reachable here without hovering.
+            Click or press Enter on a row for detail.</p></div></div>
+        <div style="overflow:auto;max-height:70vh"><table class="tv" id="allTable"></table></div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <p id="footGen"></p>
+      <p style="margin:10px 0 0">What the numbers do and don't cover:</p>
+      <ul>
+        <li><b>History starts Nov 2023</b>, when the Reservoir index was created with 213 packages
+          already in it. The step at the left of the growth charts is the registry's birth, not the
+          ecosystem's.</li>
+        <li><b>Counts are of packages that still exist.</b> 922 packages have been indexed at some
+          point and <span id="footNow">—</span> are indexed now, so a package added and later removed
+          appears in no month at all.</li>
+      </ul>
+      <p style="margin:10px 0 0">
+        Built from the <a href="https://github.com/leanprover/reservoir-index">Reservoir index</a>
+        by <a href="https://github.com/austinletson/reservoir-analysis">reservoir-analysis</a>.
+        <a href="https://reservoir.lean-lang.org">Reservoir</a> is the Lean 4 package registry.
+      </p>
+    </footer>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside id="drawer" role="dialog" aria-labelledby="drawerTitle">
+  <button class="btn closex" id="closeDrawer" type="button">Close</button>
+  <div id="drawerBody"></div>
+</aside>
+<div class="tip" id="tip" role="status"></div>
+<div class="sr" id="live" aria-live="polite"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

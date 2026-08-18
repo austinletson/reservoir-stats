@@ -1,0 +1,81 @@
+name: Build data and deploy site
+
+# The site is static and the data changes at most once a day, so this is the whole
+# pipeline: rebuild summary.json from the Reservoir index, then publish site/ to Pages.
+# Nothing is committed back — the data is a build artifact, not source.
+
+on:
+  schedule:
+    # 06:20 UTC. Reservoir's own index commits land through the day; nothing here is
+    # time-critical, and an off-the-hour minute avoids the top-of-hour scheduling crush.
+    - cron: "20 6 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "reservoir_stats.py"
+      - "reservoir_deps.py"
+      - "data/first-seen.json"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race. `cancel-in-progress: false` because cancelling a deploy
+# half-way is how you get a half-published site.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          # No dependencies to cache — the builders are standard library only.
+
+      - name: Build site/data/summary.json
+        run: |
+          python3 reservoir_stats.py --refresh --out site/data/summary.json | tee build.log
+
+      # The builder re-checks its own invariants and exits non-zero rather than shipping a
+      # file that violates them, so a bad index snapshot fails here and the previously
+      # deployed site stays up.
+      - name: Report what was built
+        run: |
+          {
+            echo "### Reservoir Stats data build"
+            echo
+            echo '```'
+            cat build.log
+            echo '```'
+            echo
+            echo "\`data/first-seen.json\` was last regenerated for index head"
+            echo "\`$(python3 -c 'import json;print(json.load(open("data/first-seen.json"))["indexHeadDate"])')\`."
+            echo "Packages whose first-indexed month fell back to a build date are listed as"
+            echo "\`firstMonth via oldest-version\` above — if that number grows, run the"
+            echo "**Backfill package first-seen dates** workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

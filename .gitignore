@@ -1,0 +1,13 @@
+# Generated data, except the report, which is worth tracking.
+# (`output/*` rather than `output/`, or git would not descend to see the negation.)
+output/*
+!output/most-used-libraries.md
+
+# The site's data is rebuilt by CI on every deploy, so it isn't tracked.
+# `data/first-seen.json` IS tracked — it's the one thing that can't be rederived
+# from a daily snapshot, only from a full clone of the index's history.
+site/data/*.json
+
+__pycache__/
+*.pyc
+*.svg
