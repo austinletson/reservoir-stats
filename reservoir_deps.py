@@ -42,8 +42,8 @@ from pathlib import Path
 from typing import Any, Iterable
 
 INDEX_TARBALL = "https://codeload.github.com/leanprover/reservoir-index/tar.gz/refs/heads/master"
-DEFAULT_CACHE = Path.home() / ".cache" / "reservoir-analysis" / "reservoir-index"
-USER_AGENT = "reservoir-analysis/1.0 (+https://github.com/leanprover/reservoir-index)"
+DEFAULT_CACHE = Path.home() / ".cache" / "reservoir-stats" / "reservoir-index"
+USER_AGENT = "reservoir-stats/1.0 (+https://github.com/leanprover/reservoir-index)"
 
 
 # --------------------------------------------------------------------------- fetch
