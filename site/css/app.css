@@ -215,6 +215,16 @@ body { transition: padding-right .18s ease }
   padding: 4px 9px; margin: 0 5px 5px 0; font-size: 12.5px; cursor: pointer; background: transparent;
 }
 .pill:hover { background: var(--ghost) }
+
+/* One Palomar entry. Theorem names can be long and have no spaces to break at, so they
+   wrap mid-token rather than widening the panel past its own width. */
+.palo { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px }
+.palo-head { display: flex; flex-direction: column; gap: 3px }
+.palo-head code { font-size: 12px; overflow-wrap: anywhere }
+.palo-meta {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  margin-top: 6px; font-size: 12px; color: var(--muted);
+}
 .closex { position: absolute; top: 16px; right: 16px }
 .scrim {
   position: fixed; inset: 0; background: rgba(0, 0, 0, .28); z-index: 70;

@@ -30,6 +30,10 @@ export let NM = 0;
 export let PKGS = [];
 export let BY_ID = new Map();
 export let MATHLIB = null;
+/* How many packages carry a Palomar entry. Zero means the feature has nothing to show —
+   the fetch failed, or no recent registration names an indexed package — and main.js
+   hides its filter chip rather than offer a control that can only empty the screen. */
+export let PALOMAR_N = 0;
 
 export function init(data) {
   DATA = data;
@@ -38,10 +42,15 @@ export function init(data) {
   PKGS = data.packages;
   BY_ID = new Map(PKGS.map((p) => [p.id, p]));
   MATHLIB = data.mathlibId;
+  PALOMAR_N = PKGS.reduce((n, p) => n + (hasPalomar(p) ? 1 : 0), 0);
   worldCache.clear();
   return DATA;
 }
 export const meta = () => DATA;
+
+/* Palomar entries are attached to a package only when the registry has some, so the
+   field is absent far more often than it is empty. See docs/DATA.md. */
+export const hasPalomar = (p) => !!(p.palomar && p.palomar.length);
 
 /* The dependencies a package declared as of month t.
  *
@@ -109,7 +118,10 @@ export function world(t) {
 
 /* Display scope. Note what is NOT here: the search query, which is a finder rather than
    a filter, and Collapse Mathlib, which applies only to the ranking. */
-export const inScope = (n) => n.p.stars >= state.minStars && state.classes.has(n.k);
+export const inScope = (n) =>
+  n.p.stars >= state.minStars
+  && state.classes.has(n.k)
+  && (!state.palomarOnly || hasPalomar(n.p));
 
 export function scopedAt(t) {
   const keep = new Map();

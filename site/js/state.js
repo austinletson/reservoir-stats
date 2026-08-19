@@ -12,6 +12,10 @@ export const state = {
   minStars: 0,
   classes: new Set(CLASSES.map((c) => c.k)),
   collapseMathlib: false,
+  /* Restrict scope to packages carrying a Palomar registry entry. A scope filter like
+     min stars, not a display toggle like Collapse Mathlib: it goes through inScope, so
+     dependent counts stay measured over the whole graph. */
+  palomarOnly: false,
   /* Packages with no edges in the current graph view. There are ~180 of them and they
      form a meaningless ring of confetti, so they are hidden by default and the graph
      note says so. */
@@ -46,6 +50,7 @@ function serialise() {
   if (state.classes.size !== CLASSES.length) p.set("c", [...state.classes].join(","));
   if (state.topMetric !== "used") p.set("r", state.topMetric);
   if (state.collapseMathlib) p.set("m", "1");
+  if (state.palomarOnly) p.set("pl", "1");
   if (!state.hideOrphans) p.set("o", "1");   // omitted when hidden, the default
   if (state.graphMode === "all") p.set("g", "all");
   if (state.graphFocus) p.set("f", state.graphFocus);
@@ -92,6 +97,7 @@ export function readHash() {
   if (!state.classes.size) state.classes = new Set(CLASSES.map((c) => c.k));
   state.topMetric = p.get("r") === "growth" ? "growth" : "used";
   state.collapseMathlib = p.get("m") === "1";
+  state.palomarOnly = p.get("pl") === "1";
   state.hideOrphans = p.get("o") !== "1";
   state.graphMode = p.get("g") === "all" ? "all" : "focus";
   state.graphFocus = p.get("f") || null;

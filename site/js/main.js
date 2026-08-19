@@ -12,7 +12,7 @@ import { buildGraph, draw as drawGraph, initGraph, reheat, resizeCanvas, syncGra
 import { drawAllTable } from "./table.js";
 import {
   BY_ID, counts, growth, init, MATHLIB, matchesQuery, meta, MONTHS, NM,
-  PKGS, scopedAt, total as totalOf, world,
+  PALOMAR_N, PKGS, scopedAt, total as totalOf, world,
 } from "./world.js";
 
 const $ = (id) => document.getElementById(id);
@@ -43,6 +43,13 @@ async function boot() {
   $("app").classList.remove("hidden");
 
   buildChips();
+  // A build whose Palomar fetch failed, or a feed naming no indexed package, leaves a
+  // chip whose only possible effect is to empty every view. Drop the control instead,
+  // and drop the state a deep link may have set with it.
+  if (!PALOMAR_N) {
+    state.palomarOnly = false;
+    $("palomarFilter").classList.add("hidden");
+  }
   wireControls();
   initDrawer({ navigate: openPackage, close: closePackage });
   initGraph({ open: openPackage });
@@ -135,6 +142,15 @@ function renderScopeBar(keep, w, total) {
   }
   if (state.view === "graph" && state.hideOrphans) {
     parts.push(" The graph hides packages with no edges — use the toggle to show them.");
+  }
+  if (state.palomarOnly) {
+    // Absence in this feed is not absence from Palomar, and a scope bar that let a reader
+    // believe otherwise would be the same class of lie as the filtered-then-counted bug.
+    // Deliberately no count of its own: the bold prefix already states how many packages
+    // survive every filter, and a second number here would read as disagreeing with it.
+    parts.push(" Limited to packages with an entry in Palomar's recent-registrations feed."
+      + " That feed is not the whole registry, so a package missing here may still be on"
+      + " Palomar.");
   }
   if (state.collapseMathlib) {
     parts.push(state.view === "graph"
@@ -291,6 +307,7 @@ function syncControls() {
   $("asof").setAttribute("aria-valuetext", MONTHS[state.asof]);
   $("minstars").value = String(state.minStars);
   $("collapseMathlib").setAttribute("aria-pressed", String(state.collapseMathlib));
+  $("palomarOnly").setAttribute("aria-pressed", String(state.palomarOnly));
   syncGraphControls();
   $("find").value = state.query;
   document.querySelectorAll("#topMetric button").forEach((b) =>
@@ -320,6 +337,12 @@ function wireControls() {
   $("collapseMathlib").addEventListener("click", (e) => {
     state.collapseMathlib = !state.collapseMathlib;
     e.currentTarget.setAttribute("aria-pressed", String(state.collapseMathlib));
+    render();
+  });
+
+  $("palomarOnly").addEventListener("click", (e) => {
+    state.palomarOnly = !state.palomarOnly;
+    e.currentTarget.setAttribute("aria-pressed", String(state.palomarOnly));
     render();
   });
 

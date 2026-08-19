@@ -23,7 +23,7 @@ editing one file serves a stale mix of old and new.
 | | |
 | --- | --- |
 | `site/` | the site: three views over a month slider covering the registry's whole history |
-| `reservoir_stats.py` | builds the site's data, reconstructing a dependency graph per month |
+| `reservoir_stats.py` | builds the site's data, reconstructing a dependency graph per month, and joins in [Palomar](https://palomar-registry.org) registry entries |
 | `first_seen.py` | mines first-indexed dates from the index's git history. Occasional, not daily |
 | `reservoir_deps.py` | standalone point-in-time graph dump, as CSV, JSON and Graphviz |
 | [`docs/DATA.md`](docs/DATA.md) | the data shape, how the history is reconstructed, and what it cannot say |
