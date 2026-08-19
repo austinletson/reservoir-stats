@@ -16,9 +16,13 @@ backs reservoir.lean-lang.org. Per package it stores
 <owner>/<name>/builds.json     one dated entry per build attempt, with its toolchain
 ```
 
-No other source is used. No GitHub API calls, so no tokens and no rate limits.
+No GitHub API calls, so no tokens and no rate limits.
+
+One thing is not derived from the index, and is the only external source in the build:
+**Palomar entries**, from [`data.palomar-registry.org/recent.json`][palomar]. See below.
 
 [index]: https://github.com/leanprover/reservoir-index
+[palomar]: https://data.palomar-registry.org/recent.json
 
 ## How the history is reconstructed
 
@@ -83,7 +87,8 @@ breakdown of which rule matched how many packages; currently 8 of 806 use the fa
 ```jsonc
 {
   "generatedAt": "2026-08-17T12:00:00Z",   // rendered in the footer, so a stale deploy shows
-  "source":   { "index": "...", "indexHead": "...", "firstSeenHeadDate": "2026-08-14" },
+  "source":   { "index": "...", "indexHead": "...", "firstSeenHeadDate": "2026-08-14",
+                "palomar": "https://data.palomar-registry.org/recent.json" },
   "months":    ["Nov 23", ..., "Aug 26"],  // display labels, oldest first, contiguous
   "monthKeys": ["2023-11", ..., "2026-08"],// the same months, sortable
   "mathlibId": "leanprover-community/mathlib",
@@ -113,9 +118,48 @@ One package:
   "lastCommit": "Aug 26",                  // month precision only, deliberately
   "license": "Apache-2.0",                 // null, never "", when not declared
   "description": "The math library of Lean 4",
-  "repoUrl": "https://github.com/leanprover-community/mathlib4"
+  "repoUrl": "https://github.com/leanprover-community/mathlib4",
+  "palomar": [ /* PalomarEntry, newest first */ ]   // ABSENT unless the repo has entries
 }
 ```
+
+One Palomar entry:
+
+```jsonc
+{
+  "id": "PALOMAR-2026-08-19-000001",
+  "title": "rkirov/jordan_pick",              // the repository again, in every entry so far
+  "publishedAt": "2026-08-19T01:54:36Z",
+  "status": "registered",
+  "trust": "high",
+  "theorems": ["jordan_curve"],               // formalization.theorem_names, possibly empty
+  "path": "entries/PALOMAR-2026-08-19-000001-v1.json"   // relative to the feed's own host
+}
+```
+
+### Palomar entries, and the one thing to state in the UI
+
+[Palomar](https://palomar-registry.org) registers Lean-verified mathematical results
+against the repository and commit that proves them — a claim about a package that the
+Reservoir index cannot make, which is why it is worth joining in at all. `fetch_palomar`
+reads the feed once per build and attaches each entry to the package whose repository it
+cites, matched on `owner/name` from the repo URL and falling back to the index path.
+
+Three properties, each of which the UI has to say out loud rather than imply:
+
+1. **`recent.json` is a feed of recent registrations, not the registry.** It carries ten
+   entries. Absence therefore means "not among the recent entries" and never "not on
+   Palomar", so the filter chip and the drawer section both label it as a lower bound.
+   `stats.palomar_entries_in_feed` records how many the feed held.
+2. **Most entries are not Reservoir packages.** They are one-off formalization repos that
+   were never submitted to the index — currently 2 of 10 entries match, on 1 package.
+   `stats.palomar_entries_matched` and `stats.packages_with_palomar` record the join.
+3. **The fetch fails soft.** A third party being down must not turn the daily build red,
+   so a failure warns on stderr and produces a summary with no `palomar` field anywhere.
+   The site then hides the feature entirely — see `docs/UI.md`.
+
+Palomar publishes no human-facing page per entry, so the drawer links each entry to its
+own record under the feed's host, built from the `path` the feed supplies.
 
 ### What is deliberately absent
 

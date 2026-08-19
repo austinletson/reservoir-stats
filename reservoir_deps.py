@@ -128,6 +128,43 @@ def normalize_git_url(url: str | None) -> str | None:
     return u.rstrip("/") or None
 
 
+def identity_keys(meta: dict[str, Any]) -> tuple[str | None, str | None, str | None, str | None]:
+    """(GitHub node id, normalised repo URL, full name) for one metadata.json.
+
+    Shared because `first_seen.py` WRITES the first-seen tables keyed on these and
+    `reservoir_stats.py` READS them back, and the two extracted the keys independently: the
+    writer scanned every `sources[]` entry plus the flat top-level url, the reader looked
+    only at `sources[0]`. A package whose node id sat in a later source was therefore
+    filed under a key the reader could not form, and silently fell through to the path
+    fallback that the whole rename-handling exists to avoid. Nothing failed loudly; only
+    the `first_month_from_*` counters moved.
+
+    Two key spaces because each survives a different kind of rename:
+
+    - The node id (`sources[].id`, e.g. `R_kgDOFcwZ1Q`) is GitHub's immutable handle for the
+      repo, so it survives *org* renames. `lurk-lab` became `argumentcomputer`, moving 13
+      packages and changing every one of their URLs.
+    - The URL survives the index renaming a package without the repo moving, as in
+      `mathlib4` -> `mathlib` and `proofwidgets4` -> `proofwidgets`.
+
+    The 213 packages seeded at the index's first commit predate `sources[]` entirely and
+    carry a flat top-level `url`, so every lookup has to tolerate its absence.
+
+    Returns the RAW url alongside the normalised one: the normalised form is a lookup key
+    (scheme and suffix stripped), never something to put in an href.
+    """
+    node_id: str | None = None
+    raw: str | None = None
+    for src in meta.get("sources") or []:
+        node_id = node_id or (src.get("id") or None)
+        for key in ("repoUrl", "gitUrl"):
+            raw = raw or src.get(key)
+    for key in ("repoUrl", "gitUrl", "url"):
+        raw = raw or meta.get(key)
+    full_name = meta.get("fullName") or f"{meta.get('owner')}/{meta.get('name')}"
+    return node_id, normalize_git_url(raw), raw, full_name
+
+
 # --------------------------------------------------------------------------- load
 
 

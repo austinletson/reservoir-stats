@@ -11,6 +11,9 @@ import { state } from "./state.js";
 import { adoption, BY_ID, dependentsOf, MONTHS, world } from "./world.js";
 
 const MAX_PILLS = 30;
+/* Palomar publishes no human-facing page per entry, so the record itself is the link.
+   `path` is relative to the feed's host and comes from the feed. */
+const PALOMAR_HOST = "https://data.palomar-registry.org/";
 
 let onNavigate = null;   // set by main.js: (id) => void, so pills re-enter through it
 let onClose = null;
@@ -94,6 +97,12 @@ export function renderDrawer(id) {
     b4.style.color = cssv("--crit");
     meta.appendChild(b4);
   }
+  const palomar = p.palomar || [];
+  if (palomar.length) {
+    const b5 = tag("span", "badge", plural(palomar.length, "Palomar entry", "Palomar entries"));
+    b5.style.color = cssv("--good");
+    meta.appendChild(b5);
+  }
   body.appendChild(meta);
 
   const dl = tag("dl", "facts");
@@ -120,6 +129,19 @@ export function renderDrawer(id) {
     body.appendChild(s);
     return host;
   };
+
+  /* Palomar, above the charts because it is a claim about what this repository *proves*,
+     which is the strongest thing on the panel and would be buried under 30 dependent
+     pills. The caption states the feed's limit: it carries recent registrations only, so
+     the count is a lower bound and a package showing nothing here may still be listed. */
+  if (palomar.length) {
+    const palHost = section(
+      "On Palomar",
+      "Lean-verified results registered against this repository, newest first. Palomar's "
+      + "feed carries recent registrations only, so this may not be all of them.",
+    );
+    palomar.forEach((e) => palHost.appendChild(palomarEntry(e)));
+  }
 
   /* Adoption. The "+N in the last 12 months" in the caption is the point: a cumulative
      curve on its own makes an abandoned package look like a healthy plateau. */
@@ -150,6 +172,33 @@ export function renderDrawer(id) {
   }
 
   return true;
+}
+
+/* One registered result. The theorem names are the substance — `title` is the repository
+   again in every entry seen so far — so they lead, and the rest is one muted line. */
+function palomarEntry(e) {
+  const box = tag("div", "palo");
+  const head = tag("div", "palo-head");
+  const names = (e.theorems && e.theorems.length) ? e.theorems : [e.title || e.id];
+  names.forEach((t) => head.appendChild(tag("code", "", t)));
+  box.appendChild(head);
+
+  const line = tag("div", "palo-meta");
+  const bits = [
+    e.publishedAt ? e.publishedAt.slice(0, 10) : null,
+    e.status,
+    e.trust ? e.trust + " trust" : null,
+  ].filter(Boolean);
+  line.appendChild(tag("span", "", bits.join(" · ")));
+  if (e.path) {
+    const a = tag("a", "", "Record ↗");
+    a.href = PALOMAR_HOST + e.path;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    line.appendChild(a);
+  }
+  box.appendChild(line);
+  return box;
 }
 
 function muted(text) {

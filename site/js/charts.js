@@ -18,11 +18,20 @@ import {
   CLASSES, CLS, color, cssv, el, fmt, hideTip, num, pct, showTip, svgIn, tag, tdc, txt, xTicks,
 } from "./dom.js";
 import { state } from "./state.js";
-import { counts, MONTHS, scopedAt, total as totalOf } from "./world.js";
+import { counts, MONTHS, prevYear, scopedAt } from "./world.js";
+
+/* The scoped composition a year before the selected month, or null when there is not a
+   year of history yet. Both the ghost bar and the drift sentence need exactly this. */
+function yearEarlier() {
+  const t = prevYear();
+  if (t === null) return null;
+  const keep = scopedAt(t);
+  return keep.size ? { t, c: counts(keep), tot: keep.size } : null;
+}
 
 /* ================= composition: what packages require ================= */
 
-export function drawComposition(host, c, total, onOpen) {
+export function drawComposition(host, c, total) {
   if (state.compForm === "table") {
     host.textContent = "";
     const tb = tag("table", "tv");
@@ -130,26 +139,21 @@ export function drawComposition(host, c, total, onOpen) {
 
   txt(s, 0, 12, MONTHS[state.asof], "tick");
   stack(22, 40, c, total, true);
-  const prevT = state.asof - 12;
-  if (prevT >= 0) {
-    const pc = counts(scopedAt(prevT));
-    const ptot = totalOf(pc);
-    if (ptot) {
-      txt(s, 0, 92, "A year earlier · " + MONTHS[prevT], "tick");
-      stack(102, 14, pc, ptot, false);
-    }
+  const then = yearEarlier();
+  if (then) {
+    txt(s, 0, 92, "A year earlier · " + MONTHS[then.t], "tick");
+    stack(102, 14, then.c, then.tot, false);
   }
 }
 
 /* The interpretive sentences live outside the chart, so every form keeps them.
    A dashboard that makes the reader do all the interpreting is one nobody reads twice. */
-export function drawCompSummary(host, c, total, keep, mathlibId) {
+export function drawCompSummary(host, c, total, roll) {
   host.textContent = "";
   const mlAll = c.mathlib + c.mathlibplus;
-  let trans = 0;
-  for (const n of keep.values()) {
-    if (n.k !== "none" && (n.deps.includes(mathlibId) || n.reachesMathlib)) trans++;
-  }
+  // `roll` comes from world.rollup(), so this sentence and the KPI tile above it are the
+  // same number by construction rather than by two loops agreeing.
+  const trans = roll.transitive;
   const line = (strongTxt, restTxt) => {
     const d = tag("div");
     d.append(tag("b", "", strongTxt), document.createTextNode(" " + restTxt));
@@ -161,43 +165,32 @@ export function drawCompSummary(host, c, total, keep, mathlibId) {
   const d = tag("div");
   d.style.color = "var(--muted)";
   d.style.fontSize = "12.5px";
-  const prevT = state.asof - 12;
-  if (prevT >= 0) {
-    const pc = counts(scopedAt(prevT));
-    const ptot = totalOf(pc);
-    if (ptot) {
-      const drift = pct(mlAll, total) - pct(pc.mathlib + pc.mathlibplus, ptot);
-      const move = drift === 0
-        ? "held flat"
-        : `${drift > 0 ? "grown" : "fallen"} ${Math.abs(drift)} pt${Math.abs(drift) === 1 ? "" : "s"}`;
-      d.textContent = `Mathlib's direct share has ${move} over the last 12 months.`;
-    }
+  const then = yearEarlier();
+  if (then) {
+    const drift = pct(mlAll, total) - pct(then.c.mathlib + then.c.mathlibplus, then.tot);
+    const move = drift === 0
+      ? "held flat"
+      : `${drift > 0 ? "grown" : "fallen"} ${Math.abs(drift)} pt${Math.abs(drift) === 1 ? "" : "s"}`;
+    d.textContent = `Mathlib's direct share has ${move} over the last 12 months.`;
   } else {
     d.textContent = "No year-on-year comparison — less than 12 months of history at this date.";
   }
   host.appendChild(d);
 }
 
-export function drawCompLegend(host, c) {
+/* One legend. `counts` is optional: the composition card shows a per-class total beside
+   each label, the mix chart does not, and that was the only difference between what used
+   to be two near-identical functions. */
+export function drawLegend(host, counts) {
   host.textContent = "";
   for (const cl of CLASSES) {
     const d = tag("span", "it");
     const sw = tag("span", "sw");
     sw.style.background = color(cl.k);
-    d.append(sw, tag("span", "n", num(c[cl.k])), document.createTextNode(cl.label));
+    if (counts) d.append(sw, tag("span", "n", num(counts[cl.k])), document.createTextNode(cl.label));
+    else d.append(sw, document.createTextNode(cl.label));
     host.appendChild(d);
   }
-}
-
-export function drawClassLegend(host) {
-  host.textContent = "";
-  CLASSES.forEach((cl) => {
-    const d = tag("span", "it");
-    const sw = tag("span", "sw");
-    sw.style.background = color(cl.k);
-    d.append(sw, document.createTextNode(cl.label));
-    host.appendChild(d);
-  });
 }
 
 /* ================= mix over time: 100% stacked area ================= */

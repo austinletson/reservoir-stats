@@ -42,7 +42,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from reservoir_deps import normalize_git_url
+from reservoir_deps import identity_keys
 
 INDEX_REPO = "https://github.com/leanprover/reservoir-index.git"
 
@@ -119,31 +119,17 @@ def read_blobs(repo: Path, refs: list[str]) -> dict[str, str]:
 
 
 def keys_of(blob: str) -> tuple[str | None, str | None]:
-    """(GitHub node id, normalised repo URL) for one metadata.json, across both schemas.
+    """(GitHub node id, normalised repo URL) for one metadata.json blob.
 
-    Two key spaces because each survives a different kind of rename:
-
-    - The node id (`sources[].id`, e.g. `R_kgDOFcwZ1Q`) is GitHub's immutable handle for
-      the repo. It survives *org* renames — `lurk-lab` became `argumentcomputer`, moving
-      13 packages and changing every one of their URLs.
-    - The URL survives the index renaming a package without the repo moving —
-      `mathlib4` -> `mathlib`, `proofwidgets4` -> `proofwidgets`.
-
-    The 213 packages seeded at the index's first commit predate `sources[]` entirely and
-    carry a flat top-level `url`, so both lookups have to tolerate its absence.
+    Delegates to `reservoir_deps.identity_keys` so the tables written here and the lookups
+    in `reservoir_stats.py` cannot drift apart. See that docstring for why each key space
+    exists and what happened when the two sides extracted them separately.
     """
     try:
         meta = json.loads(blob)
     except json.JSONDecodeError:
         return None, None
-    node_id: str | None = None
-    url: str | None = None
-    for src in meta.get("sources") or []:
-        node_id = node_id or (src.get("id") or None)
-        for key in ("repoUrl", "gitUrl"):
-            url = url or normalize_git_url(src.get(key))
-    for key in ("repoUrl", "gitUrl", "url"):
-        url = url or normalize_git_url(meta.get(key))
+    node_id, url, _raw, _full = identity_keys(meta)
     return node_id, url
 
 

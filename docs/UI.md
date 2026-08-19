@@ -99,6 +99,14 @@ dependents and `aesop` still reports 26.
   honest. Declaring the second without the first tells assistive tech the page behind does
   not exist while Tab still goes there. So the detail panel sets both only when it is
   overlaying (below 1000px), and neither when it is docked.
+- **The Palomar chip disappears when the feed brought nothing back.** A build whose
+  Palomar fetch failed, or whose feed named no indexed package, would otherwise leave a
+  control whose only possible effect is to empty every view. `main.js` hides it and
+  clears the state a deep link may have set, so `#pl=1` on a Palomar-less build is a
+  no-op rather than a blank dashboard.
+- **The Palomar chip goes through `inScope`, not through the render.** It is a scope
+  filter like min stars, so the same rule holds: with it on, `mathlib` still reports 478
+  dependents. What it must never become is a filter applied before counting.
 - **No `localStorage`.** In-memory state plus the URL hash, so the page stays embeddable
   and a view stays shareable.
 
@@ -117,6 +125,23 @@ Beyond the stack, four:
    population is spread across dozens. The badge reads "Builds on v4.32.1", with a separate
    "Behind the newest toolchain" when it is. See `docs/DATA.md`.
 4. **The table's Declarations column is Toolchain instead**, for the same reason.
+
+## Palomar, and saying what the data cannot
+
+The one thing on the page that does not come from the Reservoir index: entries in the
+[Palomar](https://palomar-registry.org) registry of Lean-verified results, joined to the
+package whose repository they cite. A filter chip scopes the app to those packages, and
+the detail panel lists their entries with a badge above.
+
+The trap is that the source is `recent.json`, a feed of the newest registrations rather
+than the whole registry — currently ten entries, of which two match an indexed package.
+So an empty result means "not in the recent feed", and the UI is not allowed to let that
+read as "not on Palomar". Both the scope bar and the panel's caption say so in words, for
+the same reason the scope bar exists at all. See `docs/DATA.md`.
+
+The panel puts the section above the adoption chart. It is the strongest claim on the
+panel — what this repository *proves* — and below the charts it would sit under thirty
+dependent pills.
 
 ## The detail panel docks rather than overlays
 
@@ -179,6 +204,8 @@ The load-bearing ones, all of which have been run against this build:
 | Check | Expected |
 |---|---|
 | Min stars 100+ | `mathlib` 478 and `aesop` 26, unchanged |
+| Palomar chip on | same 478 and 26; scope bar states the feed is not the registry |
+| Palomar chip on a build with no entries | chip hidden, `#pl=1` ignored, dashboard unchanged |
 | Ranking callout share with filters on | ≤100% (it printed 1811% once) |
 | Slider back 12 months | composition, mix and both line charts all end at the same month |
 | Tabbable count, drawer closed | ~24, none of them inside the drawer |
