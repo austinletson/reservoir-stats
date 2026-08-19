@@ -48,6 +48,7 @@ from reservoir_deps import (
     Resolver,
     _read_json,
     fetch_index,
+    identity_keys,
     iter_package_dirs,
     normalize_git_url,
 )
@@ -92,16 +93,17 @@ def key_of_ord(o: int) -> str:
 class IndexedPackage:
     """One package, with its full dated version history rather than a single version."""
 
-    __slots__ = ("meta", "full_name", "name", "owner", "repo_url", "node_id", "versions", "builds")
+    __slots__ = ("meta", "full_name", "name", "owner", "repo_url", "repo_key", "node_id", "versions", "builds")
 
     def __init__(self, meta: dict[str, Any], versions: list[dict[str, Any]], builds: list[dict[str, Any]]):
         self.meta = meta
-        self.full_name: str = meta.get("fullName") or f"{meta.get('owner')}/{meta.get('name')}"
         self.name: str = meta.get("name") or ""
         self.owner: str = meta.get("owner") or ""
-        source = (meta.get("sources") or [{}])[0]
-        self.repo_url: str | None = source.get("repoUrl") or source.get("gitUrl") or meta.get("url")
-        self.node_id: str | None = source.get("id") or None
+        # Same extractor `first_seen.py` keyed its tables with, so a node id in a later
+        # `sources[]` entry is found rather than silently missed. `repo_key` is the
+        # normalised lookup form; `repo_url` stays raw because it becomes an href.
+        self.node_id, self.repo_key, self.repo_url, self.full_name = identity_keys(meta)
+        self.full_name = self.full_name or f"{self.owner}/{self.name}"
         # Oldest first, so "newest entry at or before month M" is a scan from the right.
         self.versions = sorted(
             (v for v in versions if v.get("date")), key=lambda v: str(v.get("date"))
@@ -167,9 +169,8 @@ class FirstSeen:
         """(ISO date, how we got it). The order is by how much the key can be trusted."""
         if pkg.node_id and pkg.node_id in self.by_node_id:
             return self.by_node_id[pkg.node_id], "node-id"
-        norm = normalize_git_url(pkg.repo_url)
-        if norm and norm in self.by_repo:
-            return self.by_repo[norm], "repo-url"
+        if pkg.repo_key and pkg.repo_key in self.by_repo:
+            return self.by_repo[pkg.repo_key], "repo-url"
         if pkg.full_name in self.by_path:
             return self.by_path[pkg.full_name], "index-path"
         if pkg.name.lower() in self.by_name:

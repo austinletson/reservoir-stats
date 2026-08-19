@@ -9,7 +9,7 @@
  * ecosystem where every release is breaking. See docs/DATA.md.
  */
 
-import { CLS, color, cssv, num, tag } from "./dom.js";
+import { CLS, color, cssv, num, tag, toolchainRelease } from "./dom.js";
 import { state } from "./state.js";
 import { growth, matchesQuery } from "./world.js";
 
@@ -65,8 +65,7 @@ export function drawAllTable(host, keep, onOpen, onSort) {
     growth: growth(n.p.id),
     ndeps: n.deps.length,
     stars: n.p.stars,
-    // Only the release part: "leanprover/lean4:v4.32.1" is noise repeated 800 times.
-    toolchain: n.p.toolchain ? n.p.toolchain.split(":").pop() : "—",
+    toolchain: toolchainRelease(n.p) || "—",
     lastCommit: n.p.lastCommit || "unknown",
   }));
 
@@ -92,6 +91,11 @@ export function drawAllTable(host, keep, onOpen, onSort) {
     return;
   }
 
+  // Hoisted: these were read via getComputedStyle inside the row loop, which at 808 rows
+  // was ~890 style lookups per render for five constant values.
+  const good = cssv("--good");
+  const swatch = Object.fromEntries(Object.keys(CLS).map((k) => [k, color(k)]));
+
   const tb = tag("tbody");
   rows.slice(0, MAX_ROWS).forEach((r) => {
     const trr = tag("tr");
@@ -107,11 +111,11 @@ export function drawAllTable(host, keep, onOpen, onSort) {
       if (k === "k") {
         const sw = tag("span");
         sw.style.cssText = "display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px";
-        sw.style.background = color(r.kk);
+        sw.style.background = swatch[r.kk];
         td.append(sw, document.createTextNode(r.k));
       } else if (k === "growth") {
         td.textContent = (r.growth > 0 ? "+" : "") + r.growth;
-        if (r.growth > 0) td.style.color = cssv("--good");
+        if (r.growth > 0) td.style.color = good;
       } else {
         td.textContent = typeof r[k] === "number" ? num(r[k]) : r[k];
       }

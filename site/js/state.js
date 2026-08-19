@@ -24,9 +24,6 @@ export const state = {
      all at once, 82% of nodes are leaves and one node owns 47% of the edges. */
   graphMode: "focus",
   graphFocus: null,
-  /* Collapse each hub's pendant packages into a single mark. 272 of them hang off Mathlib
-     alone and none carries structural information of its own. */
-  collapsePendants: true,
   query: "",
   topMetric: "used",
   selected: null,
@@ -54,25 +51,21 @@ function serialise() {
   if (!state.hideOrphans) p.set("o", "1");   // omitted when hidden, the default
   if (state.graphMode === "all") p.set("g", "all");
   if (state.graphFocus) p.set("f", state.graphFocus);
-  if (!state.collapsePendants) p.set("e", "1");
   if (state.query) p.set("q", state.query);
   if (state.selected) p.set("p", state.selected);
   return "#" + p.toString();
 }
 
-/* Guard against the hashchange listener reacting to our own writes. */
-let selfWrite = false;
-export const isSelfWrite = () => selfWrite;
+function writeHash(push) {
+  const h = serialise();
+  if (h === location.hash) return;
+  if (push) history.pushState(null, "", h);
+  else history.replaceState(null, "", h);
+}
 
 /* Filter and form changes replace: dozens of history entries for one slider drag would
    make Back useless. */
-export function syncHash() {
-  const h = serialise();
-  if (h === location.hash) return;
-  selfWrite = true;
-  history.replaceState(null, "", h);
-  selfWrite = false;
-}
+export const syncHash = () => writeHash(false);
 
 /* View and drawer changes push, so Back means what a reader expects it to mean.
  *
@@ -80,13 +73,7 @@ export function syncHash() {
  * all — pressing Back to close the drawer left the page entirely. That was its
  * best-known gap; this is the fix, together with the hashchange listener in main.js.
  */
-export function pushHash() {
-  const h = serialise();
-  if (h === location.hash) return;
-  selfWrite = true;
-  history.pushState(null, "", h);
-  selfWrite = false;
-}
+export const pushHash = () => writeHash(true);
 
 /* Read the hash into state. Returns the package id to open, if any. */
 export function readHash() {
@@ -101,7 +88,6 @@ export function readHash() {
   state.hideOrphans = p.get("o") !== "1";
   state.graphMode = p.get("g") === "all" ? "all" : "focus";
   state.graphFocus = p.get("f") || null;
-  state.collapsePendants = p.get("e") !== "1";
   state.query = (p.get("q") || "").toLowerCase();
   const v = p.get("v");
   if (v === "overview" || v === "graph" || v === "table") state.view = v;

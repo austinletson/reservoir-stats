@@ -11,9 +11,9 @@
  * Re-ordering it, adding a fifth class, or substituting a chart library's default
  * categorical scale silently breaks that. See the handoff's 02-DESIGN-SYSTEM.md.
  *
- * `hollow` is a graph-only treatment and is unused while there is no graph view: in
- * bars and areas the fourth class is a solid gray fill, because a chart whose marks
- * vary in ink weight is not honest about length.
+ * `hollow` is read only by the graph (graph.js drawNode/drawLegend). Everywhere else the
+ * fourth class is a solid gray fill, because a chart whose marks vary in ink weight is not
+ * honest about length.
  */
 export const CLASSES = [
   { k: "mathlib",     label: "Requires Mathlib only",               short: "Mathlib only",     cssvar: "--c-mathlib", hollow: false },
@@ -27,13 +27,16 @@ export const CLS = Object.fromEntries(CLASSES.map((c) => [c.k, c]));
 export const cssv = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 export const color = (k) => cssv(CLS[k].cssvar);
 
+/* One formatter, reused. `num` is called a few thousand times per render, and constructing
+   an Intl formatter per call is one of the more expensive things on that path. */
+const NF = new Intl.NumberFormat("en-US");
 export const fmt = (n) =>
-  n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "K" : Math.round(n).toLocaleString("en-US");
+  n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1) + "K" : NF.format(Math.round(n));
 export const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
 /* `many` is explicit because -s is wrong often enough to matter: "1 match" pluralises to
    "matches", and the scope bar printed "0 matchs" until it didn't. */
 export const plural = (n, one, many) => `${num(n)} ${n === 1 ? one : many || one + "s"}`;
-export const num = (n) => n.toLocaleString("en-US");
+export const num = (n) => NF.format(n);
 
 const SVGNS = "http://www.w3.org/2000/svg";
 
@@ -117,6 +120,11 @@ export const hideTip = () => {
   tipEl = tipEl || document.getElementById("tip");
   tipEl.style.opacity = 0;
 };
+
+/* "leanprover/lean4:v4.32.1" -> "v4.32.1". The release part is what a reader recognises;
+   the vendor prefix is noise repeated 800 times. Shared so the table and the drawer cannot
+   disagree about what a toolchain is called. */
+export const toolchainRelease = (p) => (p.toolchain ? p.toolchain.split(":").pop() : null);
 
 /* aria-live announcements for state changes with no visual anchor. */
 export const say = (m) => {

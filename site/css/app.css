@@ -254,6 +254,9 @@ body { transition: padding-right .18s ease }
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
   padding: 5px 9px; max-width: 62%;
 }
+/* The graph note's inline affordances ("Show all", "Collapse"). Sized here rather than via
+   cssText in graph.js, which is otherwise styled entirely from this file. */
+.gnote .btn { padding: 1px 8px; font-size: 12px }
 #graphNarrow { display: none }
 
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
@@ -261,8 +264,6 @@ body { transition: padding-right .18s ease }
 /* Boot and error states. The data is fetched, so both are real states, not hypotheticals. */
 #boot { color: var(--muted); padding: 60px 4px; text-align: center }
 #boot.err { color: var(--crit) }
-/* Hold the previous render at reduced opacity on refetch — no skeleton flash. */
-.stale { opacity: .45; transition: opacity .15s }
 
 footer.foot {
   margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border);
@@ -284,11 +285,10 @@ footer.foot li { margin-top: 3px }
   .kpi.hero .val { font-size: 36px }
 }
 
-/* The accessibility spec requires respecting this. Its stated reason is skipping the
- * graph's force-simulation animation, which this build has no graph to run — but the
- * drawer slide, the scrim fade and the tooltip fade are the same contract, so they go
- * too. Nothing here is load-bearing: every transition is cosmetic, and removing them
- * leaves the same end states. */
+/* The accessibility spec requires respecting this. graph.js honours it for the force
+ * simulation by settling the layout synchronously instead of animating; the drawer slide,
+ * the scrim fade and the page push are the same contract, so they go too. Nothing here is
+ * load-bearing: every transition is cosmetic and removing them leaves the same end states. */
 @media (prefers-reduced-motion: reduce) {
-  #drawer, .scrim, .tip, .stale, body { transition: none }
+  #drawer, .scrim, .tip, body { transition: none }
 }

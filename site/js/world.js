@@ -23,6 +23,14 @@ import { CLS } from "./dom.js";
 import { state } from "./state.js";
 
 export const HUB_MIN = 8;
+/* A hub is defined by INCOMING importance. The predicate lives here beside the threshold
+   so callers ask rather than re-spell it. */
+export const isHub = (n) => n.dependents >= HUB_MIN;
+
+/* The trailing comparison window, in months. An analysis parameter, not a rendering
+   constant, so it is named once here rather than written as `- 12` in six places. */
+export const YEAR = 12;
+export const prevYear = (t = state.asof) => (t - YEAR >= 0 ? t - YEAR : null);
 
 let DATA = null;
 export let MONTHS = [];
@@ -41,9 +49,12 @@ export function init(data) {
   NM = MONTHS.length;
   PKGS = data.packages;
   BY_ID = new Map(PKGS.map((p) => [p.id, p]));
+  // Lowercased once here rather than per comparison; see matchesQuery.
+  for (const p of PKGS) { p.nameLc = p.name.toLowerCase(); p.ownerLc = p.owner.toLowerCase(); }
   MATHLIB = data.mathlibId;
   PALOMAR_N = PKGS.reduce((n, p) => n + (hasPalomar(p) ? 1 : 0), 0);
   worldCache.clear();
+  seriesKey = null;
   return DATA;
 }
 export const meta = () => DATA;
@@ -136,11 +147,30 @@ export function counts(m) {
 }
 export const total = (c) => c.mathlib + c.mathlibplus + c.other + c.none;
 
+/* Edges out of a scoped set, and how many of it reach Mathlib at all.
+ *
+ * Both were computed independently in main.js (the KPI tile) and charts.js (the sentence
+ * directly beneath the composition chart). They are the same statistic, and the two
+ * sitting next to each other on screen while being derived separately is precisely the
+ * contradiction the scope bar calls a P0. Counted here, once. */
+export function rollup(m) {
+  let edges = 0;
+  let direct = 0;
+  let transitive = 0;
+  for (const n of m.values()) {
+    edges += n.deps.length;
+    if (n.k === "none") continue;
+    if (n.deps.includes(MATHLIB)) direct++;
+    if (n.deps.includes(MATHLIB) || n.reachesMathlib) transitive++;
+  }
+  return { edges, direct, transitive };
+}
+
 /* Dependents gained in the trailing 12 months, for the growth ranking.
    Counted over the full graph at both dates, like every other dependent count. */
 export function growth(id, t = state.asof) {
   const now = world(t).get(id);
-  const then = world(Math.max(0, t - 12)).get(id);
+  const then = world(Math.max(0, t - YEAR)).get(id);
   return (now ? now.dependents : 0) - (then ? then.dependents : 0);
 }
 
@@ -169,18 +199,37 @@ export function dependentsOf(id, t = state.asof) {
   return out;
 }
 
-export const matchesQuery = (p, q = state.query) =>
-  !q || p.name.toLowerCase().includes(q) || p.owner.toLowerCase().includes(q);
+/* Prefers the lowercase forms cached in init(). Called per node per frame from the graph's
+   draw loop while a search is active, where lowercasing allocated ~2,700 throwaway strings
+   a frame. Falls back for callers that pass a flat display row rather than a package
+   record, so carrying the cached fields is an optimisation and never a correctness
+   requirement. */
+export const matchesQuery = (p, q = state.query) => {
+  if (!q) return true;
+  const name = p.nameLc || p.name.toLowerCase();
+  const owner = p.ownerLc || p.owner.toLowerCase();
+  return name.includes(q) || owner.includes(q);
+};
 
-/* Per-month composition series, clamped to the selected date. */
+/* Per-month composition series, clamped to the selected date.
+ *
+ * Memoised on the filter tuple rather than on `asof`, because the series is a PREFIX: for a
+ * given set of filters, months 0..n never change as the slider moves. Without this, one
+ * drag across 34 months rebuilt all 34 entries on every step to display a shorter prefix of
+ * the same array, at roughly 53,000 element visits per render. */
+let seriesKey = null;
+let seriesAll = null;
+
 export function mixSeries() {
-  const out = [];
-  for (let t = 0; t <= state.asof; t++) {
-    const keep = scopedAt(t);
-    const c = counts(keep);
-    let edges = 0;
-    for (const n of keep.values()) edges += n.deps.length;
-    out.push({ t: MONTHS[t], c, tot: total(c), edges });
+  const key = `${state.minStars}|${[...state.classes].sort().join(",")}|${state.palomarOnly ? 1 : 0}`;
+  if (key !== seriesKey) {
+    seriesAll = [];
+    for (let t = 0; t < NM; t++) {
+      const keep = scopedAt(t);
+      const c = counts(keep);
+      seriesAll.push({ t: MONTHS[t], c, tot: keep.size, edges: rollup(keep).edges });
+    }
+    seriesKey = key;
   }
-  return out;
+  return seriesAll.slice(0, state.asof + 1);
 }

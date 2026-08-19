@@ -23,9 +23,9 @@
  * (outgoing), node AREA and the dark RING are how many packages depend on it (incoming).
  */
 
-import { CLS, color, cssv, hideTip, num, plural, say, showTip, tag } from "./dom.js";
+import { CLASSES, CLS, color, cssv, hideTip, num, plural, say, showTip, tag } from "./dom.js";
 import { state, syncHash } from "./state.js";
-import { BY_ID, HUB_MIN, MATHLIB, matchesQuery, scopedAt, world } from "./world.js";
+import { HUB_MIN, isHub, MATHLIB, matchesQuery, scopedAt, world } from "./world.js";
 
 const REDUCED = matchMedia("(prefers-reduced-motion: reduce)");
 
@@ -35,7 +35,11 @@ const PER_SUBROW = 12;     // items per sub-row; more than this and labels colli
 const SUBROW_GAP = 78;
 const ROW_GAP = 190;       // vertical distance from the focus node to the first sub-row
 const ROW_MAX_WIDTH = 1500;   // layout units before a sub-row wraps
-const MIN_PENDANTS = 4;    // below this, aggregating costs more clarity than it buys
+const MIN_PENDANTS = 4;
+/* One shape, one set of numbers. The aggregate pill's half-height was independently
+   written as 13, 14, 15 and 26/2 in bounds(), the edge trim, the hit test and the draw. */
+const PILL_H = 26;
+const aggHalfH = (n) => (n.kind === "agg" ? PILL_H / 2 : n.r);    // below this, aggregating costs more clarity than it buys
 
 let canvas = null;
 let ctx = null;
@@ -59,6 +63,30 @@ let kbIndex = -1;
 const expanded = new Set();
 
 const matches = (n) => state.query && n.kind === "pkg" && matchesQuery(n, state.query);
+
+/* The selected package plus its direct neighbours, or null when nothing is selected.
+ *
+ * This walk existed three times: once to print the neighbour count, once to decide which
+ * nodes to dim, and once to pick label candidates. draw() built it and threw it away
+ * immediately before calling drawLabels, which rebuilt it in the same frame. */
+/* The small inline button both notes use. Sizing lives in app.css under .gnote .btn,
+   like everything else in this file. */
+function noteButton(label, onClick) {
+  const b = tag("button", "btn", label);
+  b.type = "button";
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+function egoOf(id = state.selected) {
+  if (!id || !G.byId.has(id)) return null;
+  const set = new Set([id]);
+  for (const e of G.edges) {
+    if (e.s.id === id) set.add(e.t.id);
+    if (e.t.id === id) set.add(e.s.id);
+  }
+  return set;
+}
 const isFocusMode = () => state.graphMode !== "all";
 
 /* ---------- setup ---------- */
@@ -151,6 +179,7 @@ function buildFocus() {
 
   const mk = (n, kind) => ({
     kind: kind || "pkg", id: n.p.id, name: n.p.name, owner: n.p.owner, k: n.k,
+    nameLc: n.p.nameLc, ownerLc: n.p.ownerLc,
     dependents: n.dependents, requires: n.deps.length,
     r: Math.max(6, 2.6 * Math.sqrt(n.dependents)), x: 0, y: 0,
   });
@@ -216,7 +245,7 @@ function buildFocus() {
   if (sim.raf) { cancelAnimationFrame(sim.raf); sim.raf = 0; }
   userMoved = false;           // a new focus is a new picture, so re-fit
 
-  noteFocus(centre, allDependents, pendants, structural,
+  noteFocus(centre, allDependents, pendants,
     { requiresHidden, dependentsHidden, aggregatePendants, overflowRest: overflowRest.length });
   fitCamera();
   draw();
@@ -264,7 +293,7 @@ function layoutRow(items, yBase, dir) {
   });
 }
 
-function noteFocus(centre, allDependents, pendants, structural, info) {
+function noteFocus(centre, allDependents, pendants, info) {
   const note = document.getElementById("graphNote");
   note.textContent = "";
   const bits = [
@@ -278,11 +307,7 @@ function noteFocus(centre, allDependents, pendants, structural, info) {
 
   if (expanded.size) {
     note.appendChild(document.createTextNode(" · "));
-    const b = tag("button", "btn", "Collapse");
-    b.type = "button";
-    b.style.cssText = "padding:1px 8px;font-size:12px";
-    b.addEventListener("click", () => { expanded.clear(); buildGraph(); });
-    note.appendChild(b);
+    note.appendChild(noteButton("Collapse", () => { expanded.clear(); buildGraph(); }));
   }
 }
 
@@ -318,16 +343,13 @@ function buildAll() {
      and it is not a layout change. */
   const pendantsOf = new Map();
   const collapsed = new Set();
-  if (state.collapsePendants) {
+  {
     for (const n of pkgs) {
-      const touching = [...n.deps.filter((d) => ids.has(d))];
-      for (const other of pkgs) {
-        if (other !== n && other.deps.includes(n.p.id) && ids.has(other.p.id)) { touching.push(other.p.id); break; }
-      }
-      if (n.deps.filter((d) => ids.has(d)).length === 1 && n.dependents === 0) {
-        const hub = n.deps.find((d) => ids.has(d));
+      const inDeps = n.deps.filter((d) => ids.has(d));
+      if (inDeps.length === 1 && n.dependents === 0) {
+        const hub = inDeps[0];
         const hubNode = keep.get(hub);
-        if (hubNode && hubNode.dependents >= HUB_MIN) {
+        if (hubNode && isHub(hubNode)) {
           if (!pendantsOf.has(hub)) pendantsOf.set(hub, []);
           pendantsOf.get(hub).push(n);
         }
@@ -350,6 +372,7 @@ function buildAll() {
     const a = (i / Math.max(1, pkgs.length)) * Math.PI * 2;
     gnodes.push({
       kind: "pkg", id: n.p.id, name: n.p.name, owner: n.p.owner, k: n.k,
+      nameLc: n.p.nameLc, ownerLc: n.p.ownerLc,
       dependents: n.dependents, requires: n.deps.length,
       shown: n.deps.filter((d) => ids.has(d) && !collapsed.has(d)),
       r: Math.max(2.6, 2.5 * Math.sqrt(n.dependents)),
@@ -378,7 +401,7 @@ function buildAll() {
       for (const d of n.shown) { const t = byId.get(d); if (t) edges.push({ s: n, t }); }
     }
   }
-  const hubs = gnodes.filter((n) => n.kind === "pkg" && n.dependents >= HUB_MIN)
+  const hubs = gnodes.filter((n) => n.kind === "pkg" && isHub(n))
     .sort((a, b) => b.dependents - a.dependents);
 
   G = { nodes: gnodes, edges, byId, hubs };
@@ -395,18 +418,15 @@ function noteAll(keep, hiddenOrphans, collapsedCount, groups) {
   note.textContent = "";
 
   if (state.selected && G.byId.has(state.selected)) {
-    const nb = new Set();
-    for (const e of G.edges) {
-      if (e.s.id === state.selected) nb.add(e.t.id);
-      if (e.t.id === state.selected) nb.add(e.s.id);
-    }
+    // -1 for the selected package itself, which egoOf includes.
+    const nb = egoOf().size - 1;
     note.appendChild(document.createTextNode(
-      `Showing ${G.byId.get(state.selected).name} and its ${plural(nb.size, "neighbour")} · `));
-    const b = tag("button", "btn", "Show all");
-    b.type = "button";
-    b.style.cssText = "padding:1px 8px;font-size:12px";
-    b.addEventListener("click", () => { state.selected = null; syncHash(); buildGraph(); });
-    note.appendChild(b);
+      `Showing ${G.byId.get(state.selected).name} and its ${plural(nb, "neighbour")} · `));
+    note.appendChild(noteButton("Show all", () => {
+      state.selected = null;
+      syncHash();
+      buildGraph();
+    }));
     return;
   }
 
@@ -437,7 +457,9 @@ function drawLegend() {
     gl.appendChild(d);
     return d;
   };
-  Object.values(CLS).forEach((cl) => row(cl.label, (sw) => {
+  // CLASSES, not Object.values(CLS): dom.js documents that this ORDER is a validated
+  // colourblind-safety property, and every other consumer iterates CLASSES.
+  CLASSES.forEach((cl) => row(cl.label, (sw) => {
     sw.style.borderRadius = "50%";
     // In the graph only, "requires nothing" is hollow: on a node-link diagram "no fill"
     // reads as "no lines attached", which is what it means.
@@ -473,17 +495,28 @@ function settle() {
   draw();
 }
 
+/* Spatial hash for the neighbour scans. Rebuilt per pass on purpose, because positions
+   move between passes; it was the six lines of bucketing that were duplicated, not the
+   rebuild itself. The cell-key format lived in five places. */
+const cellKey = (x, y, cell) => ((x / cell) | 0) + "," + ((y / cell) | 0);
+
+function buildGrid(nodes, cell) {
+  const grid = new Map();
+  for (const n of nodes) {
+    const key = cellKey(n.x, n.y, cell);
+    let bucket = grid.get(key);
+    if (!bucket) grid.set(key, (bucket = []));
+    bucket.push(n);
+  }
+  return grid;
+}
+
 function step() {
   const N = G.nodes;
   const E = G.edges;
   const cell = 70;
 
-  const grid = new Map();
-  for (const n of N) {
-    const key = ((n.x / cell) | 0) + "," + ((n.y / cell) | 0);
-    if (!grid.has(key)) grid.set(key, []);
-    grid.get(key).push(n);
-  }
+  const grid = buildGrid(N, cell);
   for (const n of N) {
     const gx = (n.x / cell) | 0;
     const gy = (n.y / cell) | 0;
@@ -528,12 +561,7 @@ function step() {
   /* Hard separation. The forces alone do not resolve it: the leaves hanging off Mathlib
      squeeze the second-tier hubs inside its disc, hiding exactly what the reader came for. */
   for (let pass = 0; pass < 2; pass++) {
-    const g2 = new Map();
-    for (const n of N) {
-      const key = ((n.x / cell) | 0) + "," + ((n.y / cell) | 0);
-      if (!g2.has(key)) g2.set(key, []);
-      g2.get(key).push(n);
-    }
+    const g2 = buildGrid(N, cell);
     for (const n of N) {
       const gx = (n.x / cell) | 0;
       const gy = (n.y / cell) | 0;
@@ -573,7 +601,7 @@ function bounds() {
   let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
   for (const n of G.nodes) {
     const w = n.kind === "agg" ? pillWidth(n) / 2 : n.r;
-    const h = n.kind === "agg" ? 13 : n.r;
+    const h = aggHalfH(n);
     // Labels alternate above and below a row, so reserve label height on both sides.
     const lab = n.kind === "pkg" ? 22 : 4;
     x0 = Math.min(x0, n.x - w); x1 = Math.max(x1, n.x + w);
@@ -655,6 +683,11 @@ export function draw() {
   const ink = cssv("--ink");
   const axis = cssv("--axis");
   const muted = cssv("--muted");
+  // The four class colours were read via getComputedStyle inside the per-node loop: 672
+  // lookups a frame, ~327,000 over a force settle, for four constant values. draw() already
+  // hoisted the tokens above; these were left behind.
+  const pal = Object.fromEntries(Object.keys(CLS).map((k) => [k, color(k)]));
+  const sel = cssv("--c-mathlib");
 
   ctx.save();
   ctx.clearRect(0, 0, r.width, r.height);
@@ -664,40 +697,33 @@ export function draw() {
   if (isFocusMode()) drawFocusEdges(ink, muted);
   else drawAllEdges(axis, ink);
 
-  let ego = null;
-  if (!isFocusMode() && state.selected && G.byId.has(state.selected)) {
-    ego = new Set([state.selected]);
-    for (const e of G.edges) {
-      if (e.s.id === state.selected) ego.add(e.t.id);
-      if (e.t.id === state.selected) ego.add(e.s.id);
-    }
-  }
+  const ego = isFocusMode() ? null : egoOf();
 
   for (const n of G.nodes) {
     const dim = (state.query && !matches(n) && n.kind === "pkg") || (ego && !ego.has(n.id));
     ctx.globalAlpha = dim ? 0.15 : 1;
-    if (n.kind === "agg") drawPill(n, surf, muted, ink);
-    else drawNode(n, surf, ink);
+    if (n.kind === "agg") drawPill(n, surf, muted, ink, sel);
+    else drawNode(n, surf, ink, pal, sel);
     ctx.globalAlpha = 1;
   }
 
-  drawLabels(surf, ink);
+  drawLabels(surf, ink, ego);
   ctx.restore();
 }
 
-function drawNode(n, surf, ink) {
+function drawNode(n, surf, ink, pal, sel) {
   ctx.beginPath();
   ctx.arc(n.x, n.y, n.r, 0, 6.2832);
   if (CLS[n.k].hollow) {
     ctx.fillStyle = surf; ctx.fill();
-    ctx.strokeStyle = color(n.k); ctx.lineWidth = 1.5 / cam.k; ctx.stroke();
+    ctx.strokeStyle = pal[n.k]; ctx.lineWidth = 1.5 / cam.k; ctx.stroke();
   } else {
-    ctx.fillStyle = color(n.k); ctx.fill();
+    ctx.fillStyle = pal[n.k]; ctx.fill();
     ctx.strokeStyle = surf; ctx.lineWidth = 2 / cam.k; ctx.stroke();
   }
   // Hub-ness is INCOMING importance, so it gets its own channel and cannot be mistaken
   // for the class fill, which is outgoing.
-  if (n.dependents >= HUB_MIN) {
+  if (isHub(n)) {
     ctx.beginPath();
     ctx.arc(n.x, n.y, n.r + 2.5 / cam.k, 0, 6.2832);
     ctx.strokeStyle = ink;
@@ -710,7 +736,7 @@ function drawNode(n, surf, ink) {
   if (lit) {
     ctx.beginPath();
     ctx.arc(n.x, n.y, n.r + 6 / cam.k, 0, 6.2832);
-    ctx.strokeStyle = cssv("--c-mathlib");
+    ctx.strokeStyle = sel;
     ctx.lineWidth = 2.6 / cam.k;
     ctx.stroke();
   }
@@ -718,14 +744,14 @@ function drawNode(n, surf, ink) {
 
 /* An aggregate is not a package, so it must not look like one. Dashed outline, no class
    colour, and the count as its label. */
-function drawPill(n, surf, muted, ink) {
+function drawPill(n, surf, muted, ink, sel) {
   const w = pillWidth(n);
-  const h = 26;
+  const h = PILL_H;
   roundRect(n.x - w / 2, n.y - h / 2, w, h, 7);
   ctx.fillStyle = surf;
   ctx.fill();
   ctx.setLineDash([4 / cam.k, 3 / cam.k]);
-  ctx.strokeStyle = n === hoverNode ? cssv("--c-mathlib") : muted;
+  ctx.strokeStyle = n === hoverNode ? sel : muted;
   ctx.lineWidth = 1.4 / cam.k;
   ctx.stroke();
   ctx.setLineDash([]);
@@ -745,8 +771,8 @@ function drawFocusEdges(ink, muted) {
     const lit = hoverNode && (e.s === hoverNode || e.t === hoverNode);
     ctx.strokeStyle = lit ? ink : muted;
     ctx.globalAlpha = lit ? 0.9 : 0.5;
-    const sr = e.s.kind === "agg" ? 14 : e.s.r;
-    const tr = e.t.kind === "agg" ? 14 : e.t.r;
+    const sr = aggHalfH(e.s);
+    const tr = aggHalfH(e.t);
     const dx = e.t.x - e.s.x;
     const dy = e.t.y - e.s.y;
     const d = Math.hypot(dx, dy) || 1;
@@ -811,7 +837,7 @@ function taper(e, wide) {
   ctx.fill();
 }
 
-function drawLabels(surf, ink) {
+function drawLabels(surf, ink, ego) {
   ctx.font = "600 " + (11 / cam.k).toFixed(2) + "px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "alphabetic";
@@ -854,14 +880,6 @@ function drawLabels(surf, ink) {
   const overlaps = (box, self) => placed.some((b) => hit(box, b))
     || bigNodes.some((b) => b !== self && hit(box, { x0: b.x - b.r, x1: b.x + b.r, y0: b.y - b.r, y1: b.y + b.r }));
 
-  let ego = null;
-  if (state.selected && G.byId.has(state.selected)) {
-    ego = new Set([state.selected]);
-    for (const e of G.edges) {
-      if (e.s.id === state.selected) ego.add(e.t.id);
-      if (e.t.id === state.selected) ego.add(e.s.id);
-    }
-  }
   const egoCands = ego
     ? G.nodes.filter((n) => ego.has(n.id) && n.kind === "pkg").sort((a, b) => b.dependents - a.dependents).slice(0, 12)
     : [];
@@ -891,7 +909,7 @@ function nodeAt(cx, cy) {
   for (const n of G.nodes) {
     if (n.kind === "agg") {
       const w = pillWidth(n) / 2;
-      if (Math.abs(x - n.x) < w && Math.abs(y - n.y) < 15) return n;
+      if (Math.abs(x - n.x) < w && Math.abs(y - n.y) < aggHalfH(n) + 2) return n;
       continue;
     }
     const d = Math.hypot(n.x - x, n.y - y);

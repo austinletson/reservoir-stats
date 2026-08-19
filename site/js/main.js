@@ -4,15 +4,15 @@ import {
   CLASSES, color, num, pct, plural, say, tag,
 } from "./dom.js";
 import {
-  drawClassLegend, drawComposition, drawCompLegend, drawCompSummary, drawMix, drawTop, lineChart,
+  drawComposition, drawCompSummary, drawLegend, drawMix, drawTop, lineChart,
 } from "./charts.js";
 import { hideDrawer, initDrawer, isOpen, renderDrawer, setLayoutChangeHandler, showDrawer } from "./drawer.js";
 import { pushHash, readHash, setMonthCount, state, syncHash } from "./state.js";
 import { buildGraph, draw as drawGraph, initGraph, reheat, resizeCanvas, syncGraphControls } from "./graph.js";
 import { drawAllTable } from "./table.js";
 import {
-  BY_ID, counts, growth, init, MATHLIB, matchesQuery, meta, MONTHS, NM,
-  PALOMAR_N, PKGS, scopedAt, total as totalOf, world,
+  BY_ID, counts, growth, init, MATHLIB, matchesQuery, meta, mixSeries, MONTHS, NM,
+  PALOMAR_N, PKGS, prevYear, rollup, scopedAt, world,
 } from "./world.js";
 
 const $ = (id) => document.getElementById(id);
@@ -91,32 +91,30 @@ export function render() {
     const total = keep.size;
     const w = world(state.asof);
 
+    const roll = rollup(keep);
     renderScopeBar(keep, w, total);
-    renderKpis(keep, c, total, w);
+    renderKpis(keep, c, total, roll);
 
     drawComposition($("compChart"), c, total);
-    drawCompSummary($("compSummary"), c, total, keep, MATHLIB);
-    drawCompLegend($("compLegend"), c);
+    drawCompSummary($("compSummary"), c, total, roll);
+    drawLegend($("compLegend"), c);
 
-    const series = [];
-    for (let t = 0; t <= state.asof; t++) {
-      const k = scopedAt(t);
-      const cc = counts(k);
-      let edges = 0;
-      for (const n of k.values()) edges += n.deps.length;
-      series.push({ t: MONTHS[t], c: cc, tot: totalOf(cc), edges });
-    }
+    const series = mixSeries();
     drawMix($("mixChart"), series);
-    drawClassLegend($("mixLegend"));
+    drawLegend($("mixLegend"));
 
     renderRanking(keep, w);
 
     lineChart($("ecoN"), { values: series.map((r) => r.tot), months: series.map((r) => r.t), name: "packages" });
     lineChart($("ecoE"), { values: series.map((r) => r.edges), months: series.map((r) => r.t), name: "edges" });
 
-    drawAllTable($("allTable"), keep, openPackage, render);
-    // Only when visible: the node set is scope-dependent, but rebuilding it for a panel
-    // nobody is looking at just reheats a simulation into a zero-size canvas.
+    /* Build only what is on screen. The table is 808 rows of 9 cells with two listeners
+       each, and #view-table is display:none in two of the three views. Rebuilding it
+       anyway cost ~8,900 elements and ~1,600 listener registrations per render, and the
+       month slider fires one render per step, so a single drag across 34 months built and
+       discarded roughly 300,000 elements. The graph was already gated this way. */
+    if (state.view === "table") renderTable(keep);
+    else tableDirty = true;
     if (state.view === "graph") buildGraph();
 
     syncChips();
@@ -124,6 +122,15 @@ export function render() {
   } finally {
     rendering = false;
   }
+}
+
+/* The table is rebuilt on reveal rather than on every render, so it has to remember that
+   the data moved underneath it while it was hidden. */
+let tableDirty = true;
+
+function renderTable(keep = scopedAt(state.asof)) {
+  drawAllTable($("allTable"), keep, openPackage, render);
+  tableDirty = false;
 }
 
 /* The scope bar. If this and what's on screen disagree, that is a P0 bug: it is the
@@ -161,9 +168,9 @@ function renderScopeBar(keep, w, total) {
   sb.append(strong, document.createTextNode(parts.join("")));
 }
 
-function renderKpis(keep, c, total, w) {
-  const prevT = state.asof - 12;
-  const prev = prevT >= 0 ? scopedAt(prevT).size : 0;
+function renderKpis(keep, c, total, roll) {
+  const prevT = prevYear();
+  const prev = prevT === null ? 0 : scopedAt(prevT).size;
 
   $("kPkgs").textContent = num(total);
   const ps = $("kPkgsSub");
@@ -176,25 +183,20 @@ function renderKpis(keep, c, total, w) {
     ps.textContent = "as of " + MONTHS[state.asof];
   }
 
-  let edges = 0;
-  let trans = 0;
-  for (const n of keep.values()) {
-    edges += n.deps.length;
-    if (n.k !== "none" && (n.deps.includes(MATHLIB) || n.reachesMathlib)) trans++;
-  }
-  $("kEdges").textContent = num(edges);
-  $("kEdgesSub").textContent = (total ? (edges / total).toFixed(2) : "0") + " per package";
+  $("kEdges").textContent = num(roll.edges);
+  $("kEdgesSub").textContent = (total ? (roll.edges / total).toFixed(2) : "0") + " per package";
 
   const ml = c.mathlib + c.mathlibplus;
-  $("kMathlib").textContent = pct(trans, total) + "%";
-  $("kMathlibSub").textContent = `${pct(ml, total)}% directly · ${pct(trans - ml, total)}% only through something else`;
+  $("kMathlib").textContent = pct(roll.transitive, total) + "%";
+  $("kMathlibSub").textContent =
+    `${pct(ml, total)}% directly · ${pct(roll.transitive - ml, total)}% only through something else`;
 
   $("kNone").textContent = pct(c.none, total) + "%";
   $("kNoneSub").textContent = plural(c.none, "package");
 }
 
 function renderRanking(keep, w) {
-  const prevT = state.asof - 12;
+  const prevT = prevYear();
   // Collapse Mathlib removes it from the ranking only — never from the counts, which is
   // why this filters the display pool rather than the world.
   const pool = [...keep.values()].filter((n) => !(state.collapseMathlib && n.p.id === MATHLIB));
@@ -214,7 +216,7 @@ function renderRanking(keep, w) {
   $("topTitle").textContent = state.topMetric === "used" ? "Most depended-on packages" : "Fastest growing packages";
   $("topCap").textContent = state.topMetric === "used"
     ? "Direct dependents, counted across the whole graph — not just the packages in scope."
-    : `New dependents gained since ${MONTHS[Math.max(0, prevT)]}.`;
+    : `New dependents gained since ${MONTHS[prevT === null ? 0 : prevT]}.`;
   drawTop($("topCallout"), $("topChart"), ranked, state.topMetric, openPackage);
 }
 
@@ -256,6 +258,7 @@ function setView(v, opts = {}) {
   // arriving at the tab for the first time would otherwise reheat an empty node set and
   // paint nothing.
   if (state.view === "graph") { buildGraph(); reheat(); }
+  if (state.view === "table" && tableDirty) renderTable();
   if (opts.push === false) syncHash();
   else pushHash();
 }
