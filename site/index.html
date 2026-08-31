@@ -52,6 +52,13 @@
         <button class="chip gchip" id="palomarOnly" aria-pressed="false" type="button"
           title="Keep only packages whose repository has an entry in the Palomar registry of Lean-verified results. Palomar publishes a feed of recent registrations, not the whole registry, so this is a lower bound.">On Palomar</button>
       </span>
+      <!-- Hidden by main.js on a build where no package carries the file, for the same
+           reason as the Palomar chip: a control whose only effect is to empty the page. -->
+      <span id="formalizationFilter" style="display:flex;gap:10px;align-items:center">
+        <span class="vr"></span>
+        <button class="chip gchip" id="formalizationOnly" aria-pressed="false" type="button"
+          title="Keep only packages whose repository declares a formalization.yaml. Self-reported by each project, and only a fraction of repositories carry the file at all, so this finds the packages that declare a formalization rather than the packages that have one.">Declares formalization</button>
+      </span>
       <span class="vr"></span>
       <span style="position:relative">
         <input type="search" id="find" placeholder="Jump to a package…" aria-label="Jump to a package"

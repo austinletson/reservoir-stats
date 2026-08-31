@@ -107,6 +107,15 @@ dependents and `aesop` still reports 26.
 - **The Palomar chip goes through `inScope`, not through the render.** It is a scope
   filter like min stars, so the same rule holds: with it on, `mathlib` still reports 478
   dependents. What it must never become is a filter applied before counting.
+- **"Declares formalization" is the same kind of chip, with the same two guards.** It goes
+  through `inScope`, and it is hidden with its state cleared on a build where no package
+  carries the file — which includes any build whose GitHub sweep was skipped for want of a
+  token, not just an empty ecosystem.
+- **A new scope filter has to join `mixSeries`'s memo key.** That series is memoised on the
+  filter tuple, not on `asof`, because it is a prefix. Adding `formalizationOnly` to
+  `inScope` and not to the key leaves the mix-over-time chart showing the *previous* scope
+  until some other filter moves: Nov 23 kept reading 96 packages when the filtered answer
+  is 0. Any future filter has the same trap.
 - **No `localStorage`.** In-memory state plus the URL hash, so the page stays embeddable
   and a view stays shareable.
 
@@ -147,7 +156,14 @@ dependent pills.
 
 Directly below Palomar, the panel shows what the repository's own `formalization.yaml`
 declares: scope, `sorry` count, axioms, the named declarations, and the papers it
-formalizes. 22 of 808 packages have the file.
+formalizes, with a link to the file itself — every claim in the section is checkable only
+against it, and `/blob/HEAD/` lets GitHub resolve the default branch we do not store.
+22 of 808 packages have the file.
+
+Finding them does not require opening 808 panels: the **"Declares formalization"** chip
+scopes the whole app to those packages, and the **All packages** table's last column sorts
+them together. The column separates "declared, no sorry" from a bare "declared" for the
+same reason the badge does.
 
 It sits next to Palomar because the two answer the same question from opposite ends, and
 that is exactly why the wording has to separate them. Palomar is a third party's record of
@@ -226,6 +242,9 @@ The load-bearing ones, all of which have been run against this build:
 | Min stars 100+ | `mathlib` 478 and `aesop` 26, unchanged |
 | Palomar chip on | same 478 and 26; scope bar states the feed is not the registry |
 | Palomar chip on a build with no entries | chip hidden, `#pl=1` ignored, dashboard unchanged |
+| "Declares formalization" chip on | 22 of 808 in scope, `mathlib` still 478 elsewhere, `#fz=1` in the hash |
+| The same chip, mix-over-time chart | Nov 23 recomputes to 0 rather than staying at 96 |
+| The same chip on a build with no files | chip hidden, `#fz=1` ignored, dashboard unchanged |
 | Panel for a package with `formalization.yaml` | section present, declarations named, "no sorry" only when declared `0` |
 | Panel for a package without one | no section, no badge, no empty heading |
 | Panel for a `v0.3` file with four keys | only those four rows, nothing rendered as "unknown" |

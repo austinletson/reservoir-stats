@@ -11,8 +11,8 @@ import { pushHash, readHash, setMonthCount, state, syncHash } from "./state.js";
 import { buildGraph, draw as drawGraph, initGraph, reheat, resizeCanvas, syncGraphControls } from "./graph.js";
 import { drawAllTable } from "./table.js";
 import {
-  BY_ID, counts, growth, init, MATHLIB, matchesQuery, meta, mixSeries, MONTHS, NM,
-  PALOMAR_N, PKGS, prevYear, rollup, scopedAt, world,
+  BY_ID, counts, FORMALIZATION_N, growth, init, MATHLIB, matchesQuery, meta, mixSeries,
+  MONTHS, NM, PALOMAR_N, PKGS, prevYear, rollup, scopedAt, world,
 } from "./world.js";
 
 const $ = (id) => document.getElementById(id);
@@ -49,6 +49,12 @@ async function boot() {
   if (!PALOMAR_N) {
     state.palomarOnly = false;
     $("palomarFilter").classList.add("hidden");
+  }
+  // Same for formalization.yaml: 22 of 808 packages today, and none at all on a build
+  // whose GitHub sweep was skipped for want of a token.
+  if (!FORMALIZATION_N) {
+    state.formalizationOnly = false;
+    $("formalizationFilter").classList.add("hidden");
   }
   wireControls();
   initDrawer({ navigate: openPackage, close: closePackage });
@@ -158,6 +164,13 @@ function renderScopeBar(keep, w, total) {
     parts.push(" Limited to packages with an entry in Palomar's recent-registrations feed."
       + " That feed is not the whole registry, so a package missing here may still be on"
       + " Palomar.");
+  }
+  if (state.formalizationOnly) {
+    // Self-reported, and absence of the file is not absence of a formalization. Same
+    // shape of claim as the Palomar sentence above, and it has to be as explicit.
+    parts.push(` Limited to the ${num(FORMALIZATION_N)} packages declaring a`
+      + " formalization.yaml. Each is the project's own claim about its own work, and most"
+      + " repositories carry no such file whatever they formalize.");
   }
   if (state.collapseMathlib) {
     parts.push(state.view === "graph"
@@ -311,6 +324,7 @@ function syncControls() {
   $("minstars").value = String(state.minStars);
   $("collapseMathlib").setAttribute("aria-pressed", String(state.collapseMathlib));
   $("palomarOnly").setAttribute("aria-pressed", String(state.palomarOnly));
+  $("formalizationOnly").setAttribute("aria-pressed", String(state.formalizationOnly));
   syncGraphControls();
   $("find").value = state.query;
   document.querySelectorAll("#topMetric button").forEach((b) =>
@@ -346,6 +360,12 @@ function wireControls() {
   $("palomarOnly").addEventListener("click", (e) => {
     state.palomarOnly = !state.palomarOnly;
     e.currentTarget.setAttribute("aria-pressed", String(state.palomarOnly));
+    render();
+  });
+
+  $("formalizationOnly").addEventListener("click", (e) => {
+    state.formalizationOnly = !state.formalizationOnly;
+    e.currentTarget.setAttribute("aria-pressed", String(state.formalizationOnly));
     render();
   });
 

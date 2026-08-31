@@ -229,6 +229,19 @@ function formalizationSection(section, f, p) {
     + (f.version ? ` (schema ${f.version})` : "") + ". Read as a claim, not a check.",
   );
 
+  /* A link to the file itself, because every claim below is checkable only against it.
+     `HEAD` rather than a branch name: the summary carries no default branch, and GitHub
+     resolves HEAD to whatever it is. */
+  const src = tag("div");
+  src.style.cssText = "margin:0 0 8px;font-size:12.5px";
+  const a = tag("a", "", "formalization.yaml ↗");
+  a.href = (p.repoUrl || "https://github.com/" + p.id).replace(/\/$/, "")
+    + "/blob/HEAD/formalization.yaml";
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  src.appendChild(a);
+  host.appendChild(src);
+
   if (f.description && f.description !== p.description) {
     const d = tag("p", "", f.description);
     d.style.cssText = "margin:0 0 8px;font-size:12.5px;color:var(--ink2)";
