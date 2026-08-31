@@ -210,6 +210,10 @@ body { transition: padding-right .18s ease }
   margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--muted);
   text-transform: uppercase; letter-spacing: .04em;
 }
+/* A sub-heading inside a section, for the parts of a formalization.yaml that are lists of
+   their own (scope, declarations, sources). Not uppercase: h4 owns that level, and two
+   uppercase headings in a row read as two sections rather than one with parts. */
+.dsec h5 { margin: 14px 0 6px; font-size: 12.5px; font-weight: 600; color: var(--ink2) }
 .pill {
   display: inline-block; border: 1px solid var(--border); border-radius: 8px;
   padding: 4px 9px; margin: 0 5px 5px 0; font-size: 12.5px; cursor: pointer; background: transparent;

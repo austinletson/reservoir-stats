@@ -128,7 +128,7 @@ Beyond the stack, four:
 
 ## Palomar, and saying what the data cannot
 
-The one thing on the page that does not come from the Reservoir index: entries in the
+The two things on the page that do not come from the Reservoir index: entries in the
 [Palomar](https://palomar-registry.org) registry of Lean-verified results, joined to the
 package whose repository they cite. A filter chip scopes the app to those packages, and
 the detail panel lists their entries with a badge above.
@@ -142,6 +142,26 @@ the same reason the scope bar exists at all. See `docs/DATA.md`.
 The panel puts the section above the adoption chart. It is the strongest claim on the
 panel — what this repository *proves* — and below the charts it would sit under thirty
 dependent pills.
+
+### Declared formalization, which is a claim rather than a record
+
+Directly below Palomar, the panel shows what the repository's own `formalization.yaml`
+declares: scope, `sorry` count, axioms, the named declarations, and the papers it
+formalizes. 22 of 808 packages have the file.
+
+It sits next to Palomar because the two answer the same question from opposite ends, and
+that is exactly why the wording has to separate them. Palomar is a third party's record of
+a verified result. This is the project describing its own work, so the caption reads "Read
+as a claim, not a check", and two absences are never allowed to read as answers:
+
+- **No file is not "not formalized."** 786 repositories have none, which says nothing about
+  what they prove.
+- **No declared `sorry_count` is not zero.** A file that states one earns the green "no
+  sorry" badge; a file that says nothing gets the plain "Formalization declared".
+
+Every field is optional in practice, whatever the schema requires, so anything the file
+does not set is simply not drawn. A `v0.3` file with four keys renders as four rows rather
+than as a table full of "unknown".
 
 ## The detail panel docks rather than overlays
 
@@ -206,6 +226,9 @@ The load-bearing ones, all of which have been run against this build:
 | Min stars 100+ | `mathlib` 478 and `aesop` 26, unchanged |
 | Palomar chip on | same 478 and 26; scope bar states the feed is not the registry |
 | Palomar chip on a build with no entries | chip hidden, `#pl=1` ignored, dashboard unchanged |
+| Panel for a package with `formalization.yaml` | section present, declarations named, "no sorry" only when declared `0` |
+| Panel for a package without one | no section, no badge, no empty heading |
+| Panel for a `v0.3` file with four keys | only those four rows, nothing rendered as "unknown" |
 | Ranking callout share with filters on | ≤100% (it printed 1811% once) |
 | Slider back 12 months | composition, mix and both line charts all end at the same month |
 | Tabbable count, drawer closed | ~24, none of them inside the drawer |

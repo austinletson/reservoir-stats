@@ -103,6 +103,15 @@ export function renderDrawer(id) {
     b5.style.color = cssv("--good");
     meta.appendChild(b5);
   }
+  /* `sorry_count: 0` is the one thing in formalization.yaml that a reader scanning the
+     panel wants first, so it is a badge and not a row in the section below. Silence is
+     not zero: a file that declares no count gets the plain badge, never "no sorry". */
+  const f = p.formalization;
+  if (f) {
+    const b6 = tag("span", "badge", f.sorryCount === 0 ? "Formalization declared, no sorry" : "Formalization declared");
+    b6.style.color = cssv(f.sorryCount === 0 ? "--good" : "--ink2");
+    meta.appendChild(b6);
+  }
   body.appendChild(meta);
 
   const dl = tag("dl", "facts");
@@ -141,6 +150,14 @@ export function renderDrawer(id) {
       + "feed carries recent registrations only, so this may not be all of them.",
     );
     palomar.forEach((e) => palHost.appendChild(palomarEntry(e)));
+  }
+
+  /* formalization.yaml, next to Palomar because they answer the same question from
+     opposite ends: Palomar is a third party's record of a verified result, this is the
+     project's own declaration of what it set out to prove and how far it got.
+     Self-reported, which the caption has to say out loud. */
+  if (f) {
+    formalizationSection(section, f, p);
   }
 
   /* Adoption. The "+N in the last 12 months" in the caption is the point: a cumulative
@@ -199,6 +216,106 @@ function palomarEntry(e) {
   }
   box.appendChild(line);
   return box;
+}
+
+/* One formalization.yaml, as a claim (scope), a completeness line (sorry, axioms), the
+   declarations it names, and what it formalizes (sources). Every part is optional: the
+   schema requires four keys and the files in the wild fill in wildly different subsets,
+   so anything absent is simply not drawn rather than drawn as "unknown". */
+function formalizationSection(section, f, p) {
+  const host = section(
+    "Declared formalization",
+    "From formalization.yaml in the repository, self-reported by the project"
+    + (f.version ? ` (schema ${f.version})` : "") + ". Read as a claim, not a check.",
+  );
+
+  if (f.description && f.description !== p.description) {
+    const d = tag("p", "", f.description);
+    d.style.cssText = "margin:0 0 8px;font-size:12.5px;color:var(--ink2)";
+    host.appendChild(d);
+  }
+
+  const dl = tag("dl", "facts");
+  const fact = (k, v) => dl.append(tag("dt", "", k), tag("dd", "", v));
+  // Absent and zero say different things, so only a declared count is shown as a number.
+  if (typeof f.sorryCount === "number") {
+    fact("Sorry", f.sorryCount === 0
+      ? "none declared"
+      : plural(f.sorryCount, "sorry", "sorries")
+        + (f.sorryInDefinitions ? `, ${f.sorryInDefinitions} in definitions` : ""));
+  }
+  if (f.axioms && f.axioms.length) fact("Axioms", f.axioms.join(", "));
+  if (f.role) fact("Repository role", f.role.replace(/-/g, " "));
+  if (f.automation && f.automation.length) fact("Produced by", f.automation.join(", "));
+  if (f.review) fact("Review", f.review);
+  if (f.license) fact("Declared license", f.license);
+  if (f.authors && f.authors.length) {
+    fact("Authors", f.authors.length > 6
+      ? `${f.authors.slice(0, 6).join(", ")} +${f.authors.length - 6} more`
+      : f.authors.join(", "));
+  }
+  const subjects = [...(f.arxiv || []), ...(f.msc2020 || [])];
+  if (subjects.length) fact("Classified", subjects.join(", "));
+  if (dl.childElementCount) host.appendChild(dl);
+
+  if (f.scope) {
+    const sc = tag("p", "", f.scope);
+    sc.style.cssText = "margin:8px 0 0;font-size:12.5px;color:var(--ink2)";
+    host.append(tag("h5", "", "Scope"), sc);
+  }
+
+  /* The declarations are the substance: a named theorem in a named file is the one part
+     of this file a reader can go and check for themselves. */
+  if (f.mainResults && f.mainResults.length) {
+    host.appendChild(tag("h5", "", plural(f.mainResults.length, "Main result")));
+    f.mainResults.forEach((r) => {
+      const box = tag("div", "palo");
+      const head = tag("div", "palo-head");
+      if (r.declaration) head.appendChild(tag("code", "", r.declaration));
+      box.appendChild(head);
+      const bits = [r.file, typeof r.sorryCount === "number" && r.sorryCount > 0
+        ? plural(r.sorryCount, "sorry", "sorries") : null].filter(Boolean);
+      if (bits.length) {
+        const line = tag("div", "palo-meta");
+        line.appendChild(tag("span", "", bits.join(" · ")));
+        box.appendChild(line);
+      }
+      host.appendChild(box);
+    });
+  }
+
+  if (f.sources && f.sources.length) {
+    host.appendChild(tag("h5", "", plural(f.sources.length, "Source")));
+    f.sources.forEach((src) => {
+      const box = tag("div", "palo");
+      box.appendChild(tag("div", "palo-head", src.title || src.id || "untitled"));
+      const line = tag("div", "palo-meta");
+      line.appendChild(tag("span", "", [src.type, src.relationship].filter(Boolean).join(" · ")));
+      // Only arXiv and DOI ids are dereferenceable; an ISBN or a bare string is not.
+      const href = sourceHref(src.id);
+      if (href) {
+        const a = tag("a", "", "Source ↗");
+        a.href = href;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        line.appendChild(a);
+      } else if (src.id) {
+        line.appendChild(tag("span", "", src.id));
+      }
+      box.appendChild(line);
+      host.appendChild(box);
+    });
+  }
+}
+
+/* `sources[].id` is a free-text identifier in the schema. In the files seen so far it is
+   an arXiv URL, a DOI, or an ISBN, and only the first two resolve to anything. */
+function sourceHref(id) {
+  if (!id) return null;
+  if (/^https?:\/\//.test(id)) return id;
+  if (/^10\.\d{4,}\//.test(id)) return "https://doi.org/" + id;
+  if (/^arxiv:/i.test(id)) return "https://arxiv.org/abs/" + id.slice(6).trim();
+  return null;
 }
 
 function muted(text) {

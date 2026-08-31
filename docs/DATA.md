@@ -88,7 +88,8 @@ breakdown of which rule matched how many packages; currently 8 of 806 use the fa
 {
   "generatedAt": "2026-08-17T12:00:00Z",   // rendered in the footer, so a stale deploy shows
   "source":   { "index": "...", "indexHead": "...", "firstSeenHeadDate": "2026-08-14",
-                "palomar": "https://data.palomar-registry.org/recent.json" },
+                "palomar": "https://data.palomar-registry.org/recent.json",
+                "formalizationSchema": "https://github.com/mathlib-initiative/formalization.yaml" },
   "months":    ["Nov 23", ..., "Aug 26"],  // display labels, oldest first, contiguous
   "monthKeys": ["2023-11", ..., "2026-08"],// the same months, sortable
   "mathlibId": "leanprover-community/mathlib",
@@ -119,7 +120,8 @@ One package:
   "license": "Apache-2.0",                 // null, never "", when not declared
   "description": "The math library of Lean 4",
   "repoUrl": "https://github.com/leanprover-community/mathlib4",
-  "palomar": [ /* PalomarEntry, newest first */ ]   // ABSENT unless the repo has entries
+  "palomar": [ /* PalomarEntry, newest first */ ],  // ABSENT unless the repo has entries
+  "formalization": { /* Formalization */ }          // ABSENT unless the repo has the file
 }
 ```
 
@@ -160,6 +162,79 @@ Three properties, each of which the UI has to say out loud rather than imply:
 
 Palomar publishes no human-facing page per entry, so the drawer links each entry to its
 own record under the feed's host, built from the `path` the feed supplies.
+
+### `formalization.yaml`, read from the repositories themselves
+
+[`formalization.yaml`](https://github.com/mathlib-initiative/formalization.yaml) is a
+project-level declaration of what a Lean repository formalizes: the claim, how complete
+the proof is, which paper it follows, and how it was produced. Nothing in the Reservoir
+index carries it, so `fetch_formalizations` reads it from each package's own repository
+through the GitHub contents API. 22 of the 808 indexed packages had one when this was
+written; the schema's own count across GitHub was 145 files.
+
+One package's entry, with every key absent rather than null when the file does not set it:
+
+```jsonc
+{
+  "version": "v0.4",                       // v0.3 files are in the wild too and are read
+  "name": "Marton's conjecture (the polynomial Freiman-Ruzsa conjecture)",
+  "description": "A Lean formalization of ...",   // project.description, in full
+  "authors": ["Aaron Anderson", ...],
+  "license": "Apache-2.0",                 // what the file declares, not what GitHub reports
+  "role": "substantive-development",       // or "thin-wrapper"
+  "scope": "Complete, with no unproved step, for each of the six compared theorems. ...",
+  "sorryCount": 0,                         // 0 is the point of the field; absent means unstated
+  "sorryInDefinitions": 0,
+  "axioms": ["propext", "Classical.choice", "Quot.sound"],
+  "mainResults": [{ "declaration": "Marton.pfr_conjecture",
+                    "file": "PFRPalomar/Challenge.lean", "sorryCount": 0 }],
+  "sources": [{ "title": "...", "id": "https://arxiv.org/abs/2311.05762",
+                "type": "article", "relationship": "formalizes" }],
+  "arxiv": ["math.CO", "math.NT"],
+  "msc2020": ["11B30", "11P70"],
+  "automation": ["agent", "manual"],       // automation.methods[].method, deduplicated
+  "review": "self-assessed"
+}
+```
+
+**This is a subset of the file, on purpose.** The 22 files total ~250KB of YAML against a
+454KB `summary.json`, and most of that is prose the site has nowhere to put: per-source
+notes, `tool_setup`, `prompting_notes`, `fidelity.divergences`. What is kept is what a
+reader of a package panel can act on. The parse does not validate against the schema
+either: a file missing half its required keys still says something true, and rejecting it
+would only hide the package.
+
+**Three things the UI has to state, and does.**
+
+1. **It is self-reported.** Every field is the project's own claim about its own work.
+   Palomar is a third party's record of a verified result; this is not, and the drawer
+   caption says "Read as a claim, not a check."
+2. **Absence means "no file", not "not formalized".** 786 of the 808 repositories have no
+   `formalization.yaml`, which says nothing about whether they formalize anything.
+3. **Silence is not zero.** A file that declares no `sorry_count` gets the plain
+   "Formalization declared" badge; only a declared `0` earns "no sorry".
+
+#### Why the nightly cost is ~10 requests, not 808
+
+Two pieces of per-repository state live in `~/.cache/reservoir-stats/formalization.json`,
+carried between CI runs by `actions/cache`:
+
+- **`updatedAt`**, the index's own view of the repo's last push, gates whether the repo is
+  asked about at all. A repo nobody has pushed to cannot have gained, lost or changed the
+  file. This is what makes a warm build free.
+- **`etag`** makes the request itself free when the repo *was* pushed but the file did not
+  change, because GitHub does not count a 304 against the rate limit.
+
+The trade: `updatedAt` is refreshed on **Reservoir's** crawl schedule, not GitHub's, so a
+file added today is picked up whenever the index next notices the push. A cold sweep is 808
+requests against an authenticated 5,000/hour budget, so losing the cache costs one slow
+build (~35s) and nothing else.
+
+Set `GITHUB_TOKEN` or `GH_TOKEN` for a cold run. Without one, unauthenticated GitHub allows
+60 requests an hour, so the builder **skips the feature entirely and warns** rather than
+rate-limiting two thirds of the way through and reporting files as absent when nobody
+looked. `--no-formalization` skips it deliberately; the `backfill` workflow passes that,
+because its verification build is proving something about `first-seen.json`.
 
 ### What is deliberately absent
 
@@ -255,15 +330,22 @@ Not in the contract, but the product spec requires the drawer to link to the rep
   what.
 - **`lastCommit` is month precision** because `updatedAt` is a push time and day-level
   precision would invite questions the data can't answer.
+- **`formalization.yaml` data can lag by a crawl.** It is refreshed only for repositories
+  the *index* says were pushed to, so a file added between Reservoir's crawls is picked up
+  on a later build. `stats.formalization_*` records what each sweep actually did, which is
+  how you tell "786 repositories have no file" from "786 requests never landed".
 
 ## Rebuilding
 
 ```bash
-python3 reservoir_stats.py                  # site/data/summary.json, ~0.5s from cache
+python3 -m pip install -r requirements.txt  # PyYAML, the one dependency
+python3 reservoir_stats.py                  # site/data/summary.json, ~1s from cache
 python3 reservoir_stats.py --refresh        # re-download the index first (~4s)
+python3 reservoir_stats.py --no-formalization         # skip the GitHub sweep
 python3 first_seen.py                       # data/first-seen.json, full clone, ~90s
 python3 first_seen.py --repo ~/src/reservoir-index    # reuse an existing clone
 ```
 
-Standard library only, no install step. The daily workflow runs the first of these; the
-`backfill` workflow runs the third.
+PyYAML, for `formalization.yaml`; everything else is standard library. A cold formalization
+sweep wants a token: `GITHUB_TOKEN=$(gh auth token) python3 reservoir_stats.py`. The daily
+workflow runs the first two of these; the `backfill` workflow runs the last two.

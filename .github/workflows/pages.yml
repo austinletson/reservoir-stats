@@ -3,6 +3,11 @@ name: Build data and deploy site
 # The site is static and the data changes at most once a day, so this is the whole
 # pipeline: rebuild summary.json from the Reservoir index, then publish site/ to Pages.
 # Nothing is committed back — the data is a build artifact, not source.
+#
+# One piece of state does persist between runs, through actions/cache rather than git:
+# the formalization.yaml sweep's per-repository ETags and push times. A cache miss is not
+# a failure, it just makes that build ask GitHub about all 808 repositories instead of
+# the ~10 that were pushed to. See `fetch_formalizations`.
 
 on:
   schedule:
@@ -16,6 +21,7 @@ on:
       - "reservoir_stats.py"
       - "reservoir_deps.py"
       - "data/first-seen.json"
+      - "requirements.txt"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -39,9 +45,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          # No dependencies to cache — the builders are standard library only.
+          cache: pip
+
+      # PyYAML, to read the formalization.yaml files. Everything else is standard library.
+      - name: Install dependencies
+        run: python3 -m pip install --quiet -r requirements.txt
+
+      # Keyed by run so every build writes a fresh entry, restored from the newest
+      # previous one. `restore-keys` is what makes this incremental at all: an exact-key
+      # miss still gets yesterday's ETags.
+      - name: Restore the formalization.yaml scan cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/reservoir-stats/formalization.json
+          key: formalization-${{ github.run_id }}
+          restore-keys: |
+            formalization-
 
       - name: Build site/data/summary.json
+        env:
+          # Reading formalization.yaml from 808 repositories needs an authenticated
+          # budget; unauthenticated GitHub allows 60 requests an hour. The builder warns
+          # and skips the feature rather than half-collecting it if this is unset.
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 reservoir_stats.py --refresh --out site/data/summary.json | tee build.log
 
