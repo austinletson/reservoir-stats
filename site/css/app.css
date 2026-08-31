@@ -210,6 +210,10 @@ body { transition: padding-right .18s ease }
   margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--muted);
   text-transform: uppercase; letter-spacing: .04em;
 }
+/* A section heading that IS a filename. Every other one is prose, so uppercasing them
+   costs nothing; uppercasing `formalization.yaml` changes the one literal string the
+   reader is meant to go and look for. */
+.dsec h4.file { text-transform: none; letter-spacing: 0 }
 /* A sub-heading inside a section, for the parts of a formalization.yaml that are lists of
    their own (scope, declarations, sources). Not uppercase: h4 owns that level, and two
    uppercase headings in a row read as two sections rather than one with parts. */

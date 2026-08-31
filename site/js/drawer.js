@@ -108,7 +108,7 @@ export function renderDrawer(id) {
      not zero: a file that declares no count gets the plain badge, never "no sorry". */
   const f = p.formalization;
   if (f) {
-    const b6 = tag("span", "badge", f.sorryCount === 0 ? "Formalization declared, no sorry" : "Formalization declared");
+    const b6 = tag("span", "badge", f.sorryCount === 0 ? "formalization.yaml, no sorry" : "formalization.yaml");
     b6.style.color = cssv(f.sorryCount === 0 ? "--good" : "--ink2");
     meta.appendChild(b6);
   }
@@ -128,9 +128,9 @@ export function renderDrawer(id) {
   fact("Toolchain", release || "unknown");
   body.appendChild(dl);
 
-  const section = (title, cap) => {
+  const section = (title, cap, h4cls) => {
     const s = tag("div", "dsec");
-    const h4 = tag("h4", "", title);
+    const h4 = tag("h4", h4cls || "", title);
     const c = tag("p", "cap", cap);
     c.style.cssText = "color:var(--muted);margin:0 0 6px";
     const host = tag("div");
@@ -224,17 +224,19 @@ function palomarEntry(e) {
    so anything absent is simply not drawn rather than drawn as "unknown". */
 function formalizationSection(section, f, p) {
   const host = section(
-    "Declared formalization",
-    "From formalization.yaml in the repository, self-reported by the project"
-    + (f.version ? ` (schema ${f.version})` : "") + ". Read as a claim, not a check.",
+    "formalization.yaml",
+    "Declared by the project in its own repository"
+    + (f.version ? `, to schema ${f.version}` : "") + ". Read as a claim, not a check.",
+    "file",
   );
 
   /* A link to the file itself, because every claim below is checkable only against it.
-     `HEAD` rather than a branch name: the summary carries no default branch, and GitHub
-     resolves HEAD to whatever it is. */
+     Labelled "View the file" rather than repeating the name a third time in four lines,
+     the heading and the caption having said it already. `HEAD` rather than a branch name:
+     the summary carries no default branch, and GitHub resolves HEAD to whatever it is. */
   const src = tag("div");
   src.style.cssText = "margin:0 0 8px;font-size:12.5px";
-  const a = tag("a", "", "formalization.yaml ↗");
+  const a = tag("a", "", "View the file ↗");
   a.href = (p.repoUrl || "https://github.com/" + p.id).replace(/\/$/, "")
     + "/blob/HEAD/formalization.yaml";
   a.target = "_blank";

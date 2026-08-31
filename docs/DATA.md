@@ -212,7 +212,7 @@ would only hide the package.
 2. **Absence means "no file", not "not formalized".** 786 of the 808 repositories have no
    `formalization.yaml`, which says nothing about whether they formalize anything.
 3. **Silence is not zero.** A file that declares no `sorry_count` gets the plain
-   "Formalization declared" badge; only a declared `0` earns "no sorry".
+   "formalization.yaml" badge; only a declared `0` earns "no sorry".
 
 #### Why the nightly cost is ~10 requests, not 808
 

@@ -26,7 +26,7 @@ const COLS = [
   /* The one column that is a claim rather than a measurement, which is why it is last and
      why sorting it is the point: it is the only way to see all 22 packages declaring a
      formalization.yaml without opening 808 panels. */
-  ["formalization", "Formalization", ""],
+  ["formalization", "formalization.yaml", ""],
 ];
 
 const MAX_ROWS = 900;

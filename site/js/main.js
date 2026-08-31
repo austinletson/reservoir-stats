@@ -168,9 +168,9 @@ function renderScopeBar(keep, w, total) {
   if (state.formalizationOnly) {
     // Self-reported, and absence of the file is not absence of a formalization. Same
     // shape of claim as the Palomar sentence above, and it has to be as explicit.
-    parts.push(` Limited to the ${num(FORMALIZATION_N)} packages declaring a`
-      + " formalization.yaml. Each is the project's own claim about its own work, and most"
-      + " repositories carry no such file whatever they formalize.");
+    parts.push(` Limited to the ${num(FORMALIZATION_N)} packages with a formalization.yaml.`
+      + " Each file is the project's own claim about its own work, and most repositories"
+      + " carry no such file whatever they formalize.");
   }
   if (state.collapseMathlib) {
     parts.push(state.view === "graph"
