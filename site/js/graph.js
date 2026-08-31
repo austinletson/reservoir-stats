@@ -150,10 +150,11 @@ export function syncGraphControls() {
 export function focusId() {
   const w = world(state.asof);
   const wanted = state.graphFocus || state.selected;
-  if (wanted && w.has(wanted)) return wanted;
+  if (wanted && w.has(wanted) && !(state.collapseMathlib && wanted === MATHLIB)) return wanted;
   let best = null;
   let bd = -1;
-  for (const [id, n] of w) if (n.dependents > bd) { bd = n.dependents; best = id; }
+  for (const [id, n] of w)
+    if (!(state.collapseMathlib && id === MATHLIB) && n.dependents > bd) { bd = n.dependents; best = id; }
   return best;
 }
 
@@ -190,14 +191,15 @@ function buildFocus() {
   // Requires: what this package stands on. Small for almost everything.
   const requires = centre.deps
     .map((d) => w.get(d))
-    .filter((n) => n && inScope.has(n.p.id))
+    .filter((n) => n && inScope.has(n.p.id) && !(state.collapseMathlib && n.p.id === MATHLIB))
     .sort((a, b) => b.dependents - a.dependents)
     .map((n) => mk(n));
   const requiresHidden = centre.deps.length - requires.length;
 
   // Dependents, split so the pendant mass does not crowd out the packages that matter.
   const allDependents = [];
-  for (const [oid, on] of w) if (on.deps.includes(id)) allDependents.push(on);
+  for (const [oid, on] of w)
+    if (on.deps.includes(id) && !(state.collapseMathlib && oid === MATHLIB)) allDependents.push(on);
   const visible = allDependents.filter((n) => inScope.has(n.p.id));
   const dependentsHidden = allDependents.length - visible.length;
 
@@ -303,6 +305,7 @@ function noteFocus(centre, allDependents, pendants, info) {
   if (info.overflowRest) bits.push(`${num(info.overflowRest)} not shown`);
   const hidden = info.requiresHidden + info.dependentsHidden;
   if (hidden) bits.push(`${num(hidden)} out of scope`);
+  if (state.collapseMathlib) bits.push("Mathlib hidden");
   note.appendChild(document.createTextNode(bits.join(" · ")));
 
   if (expanded.size) {
