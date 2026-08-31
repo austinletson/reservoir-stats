@@ -159,10 +159,30 @@ dependent pills.
 ### formalization.yaml, which is a claim rather than a record
 
 Directly below Palomar, the panel shows what the repository's own `formalization.yaml`
-declares: scope, `sorry` count, axioms, the named declarations, and the papers it
-formalizes, with a link to the file itself — every claim in the section is checkable only
+declares, with a link to the file itself — every claim in the section is checkable only
 against it, and `/blob/HEAD/` lets GitHub resolve the default branch we do not store.
 22 of 808 packages have the file.
+
+Everything the file supplies, and nowhere else on the panel:
+
+| Row | From |
+|---|---|
+| the paragraph under the caption | `project.description`, shown only when it differs from the index's own description |
+| Declared name | `project.name`, shown only when it differs from the package name |
+| Sorry | `status.sorry_count`, with `sorry_in_definitions` appended |
+| Axioms | `status.axioms` |
+| Repository role | `repository.role` |
+| Produced by | `automation.methods[].method`, deduplicated |
+| Review | `review.status` |
+| Declared license | `project.license`, which is the file's claim and not what GitHub reports |
+| Authors | `project.authors`, first six then a count |
+| Classified | `classification.arxiv` and `classification.msc2020`, merged |
+| Scope | `status.scope` |
+| Main results | `status.main_results[]`: declaration, file, per-result sorry count |
+| Sources | `sources[]`: title, type, relationship, and the id as a link when it is an arXiv URL or a DOI |
+
+The badge above the fact list is `status.sorry_count` again, because it is the one thing a
+reader scanning the panel wants first.
 
 Finding them does not require opening 808 panels: the **"Has formalization.yaml"** chip
 scopes the whole app to those packages, and the **All packages** table's last column sorts
@@ -170,9 +190,21 @@ them together. The column separates "declared, no sorry" from a bare "declared" 
 same reason the badge does.
 
 It sits next to Palomar because the two answer the same question from opposite ends, and
-that is exactly why the wording has to separate them. Palomar is a third party's record of
-a verified result. This is the project describing its own work, so the caption reads "Read
-as a claim, not a check", and two absences are never allowed to read as answers:
+that is exactly why it does not look like the sections around it. Every other section on
+the panel is measured from the Reservoir index; every word in this one is copied out of a
+file in the package's own repository. So it is fenced in its own box, with a left rule, a
+`self-reported` tag on the heading, and a caption that reads "Read as a claim, not a
+check". Styling it like the measured data would invite a reader to trust the two equally.
+
+**It collapses.** A `<details>`, so keyboard support is native and there is no toggle state
+to re-apply; PFR's entry is 2,000px of prose and a reader who does not want it should be
+able to fold it away. Open by default, because fetching the file and then hiding it would
+be pointless. Whether it is open is remembered in a module variable for the session: the
+drawer body is rebuilt on every render, so without that, collapsing the box and then
+nudging the month slider would silently re-expand it. Not in the URL — it is a reading
+preference, not scope.
+
+Two absences are never allowed to read as answers:
 
 - **No file is not "not formalized."** 786 repositories have none, which says nothing about
   what they prove.
@@ -252,6 +284,7 @@ The load-bearing ones, all of which have been run against this build:
 | Panel for a package with `formalization.yaml` | section present, declarations named, "no sorry" only when declared `0` |
 | Panel for a package without one | no section, no badge, no empty heading |
 | Panel for a `v0.3` file with four keys | only those four rows, nothing rendered as "unknown" |
+| Collapsing the box, then moving the slider | stays collapsed, and stays collapsed for the next package opened |
 | Ranking callout share with filters on | ≤100% (it printed 1811% once) |
 | Slider back 12 months | composition, mix and both line charts all end at the same month |
 | Tabbable count, drawer closed | ~24, none of them inside the drawer |

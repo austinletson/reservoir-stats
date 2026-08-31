@@ -210,6 +210,31 @@ body { transition: padding-right .18s ease }
   margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--muted);
   text-transform: uppercase; letter-spacing: .04em;
 }
+/* The formalization.yaml section, fenced off from everything around it.
+   
+   Every other section on the panel is measured from the Reservoir index. Every word in
+   this one is copied out of a file in the package's own repository, and styling the two
+   the same way invites a reader to trust them equally. Hence a box, a left rule, and a
+   "self-reported" tag on the heading rather than only a sentence in the caption. */
+.fsec {
+  border: 1px solid var(--border); border-left: 3px solid var(--axis);
+  border-radius: 10px; padding: 12px 14px; background: var(--ghost);
+}
+.fsec > summary {
+  display: flex; align-items: baseline; gap: 9px; cursor: pointer;
+  list-style: none;            /* Firefox */
+}
+.fsec > summary::-webkit-details-marker { display: none }
+/* The disclosure arrow, drawn rather than inherited, so it sits at the end of the row and
+   turns with the state. */
+.fsec > summary::after { content: "▾"; margin-left: auto; color: var(--muted); font-size: 11px }
+.fsec:not([open]) > summary::after { content: "▸" }
+.fsec > summary:focus-visible { outline: 2px solid var(--c-mathlib); outline-offset: 3px; border-radius: 6px }
+.fsec > summary h4 { margin: 0 }
+.fsec-from {
+  font-size: 11px; color: var(--muted); border: 1px solid var(--border);
+  border-radius: 999px; padding: 1px 7px; white-space: nowrap;
+}
 /* A section heading that IS a filename. Every other one is prose, so uppercasing them
    costs nothing; uppercasing `formalization.yaml` changes the one literal string the
    reader is meant to go and look for. */

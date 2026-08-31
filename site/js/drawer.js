@@ -11,6 +11,13 @@ import { state } from "./state.js";
 import { adoption, BY_ID, dependentsOf, MONTHS, world } from "./world.js";
 
 const MAX_PILLS = 30;
+/* Whether the formalization.yaml box is expanded, remembered for the session.
+   The drawer body is rebuilt from scratch on every render — moving the month slider with
+   the panel open is enough — so without this, collapsing the box and then touching the
+   slider silently re-expands it. Module scope, not localStorage: the app deliberately
+   persists nothing (see docs/UI.md), and this is a reading preference, not state worth
+   putting in a shareable URL. */
+let fsecOpen = true;
 /* Palomar publishes no human-facing page per entry, so the record itself is the link.
    `path` is relative to the feed's host and comes from the feed. */
 const PALOMAR_HOST = "https://data.palomar-registry.org/";
@@ -157,7 +164,7 @@ export function renderDrawer(id) {
      project's own declaration of what it set out to prove and how far it got.
      Self-reported, which the caption has to say out loud. */
   if (f) {
-    formalizationSection(section, f, p);
+    body.appendChild(formalizationSection(f, p));
   }
 
   /* Adoption. The "+N in the last 12 months" in the caption is the point: a cumulative
@@ -222,13 +229,35 @@ function palomarEntry(e) {
    declarations it names, and what it formalizes (sources). Every part is optional: the
    schema requires four keys and the files in the wild fill in wildly different subsets,
    so anything absent is simply not drawn rather than drawn as "unknown". */
-function formalizationSection(section, f, p) {
-  const host = section(
-    "formalization.yaml",
-    "Declared by the project in its own repository"
-    + (f.version ? `, to schema ${f.version}` : "") + ". Read as a claim, not a check.",
-    "file",
+function formalizationSection(f, p) {
+  /* A <details>, so collapsing needs no state of its own: the drawer is rebuilt on every
+     render and a JS toggle would have to be re-applied or remembered, which this app has
+     nowhere to put (no localStorage, by design). Open by default — the whole point of
+     fetching the file is to show it — and native, so Enter and Space work for free.
+
+     Fenced in its own box rather than styled like the sections around it. Everything else
+     on the panel is measured from the index; every word in here is copied from a file in
+     the package's own repository, and a reader has to be able to see where one stops and
+     the other starts. */
+  const box = tag("details", "dsec fsec");
+  box.open = fsecOpen;
+  box.addEventListener("toggle", () => { fsecOpen = box.open; });
+
+  const sum = tag("summary");
+  sum.append(
+    tag("h4", "file", "formalization.yaml"),
+    tag("span", "fsec-from", "self-reported"),
   );
+  box.appendChild(sum);
+
+  const cap = tag("p", "cap",
+    "Copied from the file in the package's own repository"
+    + (f.version ? `, to schema ${f.version}` : "") + ". Read as a claim, not a check.");
+  cap.style.cssText = "color:var(--muted);margin:0 0 6px";
+  box.appendChild(cap);
+
+  const host = tag("div");
+  box.appendChild(host);
 
   /* A link to the file itself, because every claim below is checkable only against it.
      Labelled "View the file" rather than repeating the name a third time in four lines,
@@ -252,6 +281,9 @@ function formalizationSection(section, f, p) {
 
   const dl = tag("dl", "facts");
   const fact = (k, v) => dl.append(tag("dt", "", k), tag("dd", "", v));
+  // The file names the project, which is often the paper's title rather than the package's
+  // name. Shown only when it differs, or it is a row that repeats the panel's own heading.
+  if (f.name && f.name !== p.name) fact("Declared name", f.name);
   // Absent and zero say different things, so only a declared count is shown as a number.
   if (typeof f.sorryCount === "number") {
     fact("Sorry", f.sorryCount === 0
@@ -284,26 +316,26 @@ function formalizationSection(section, f, p) {
   if (f.mainResults && f.mainResults.length) {
     host.appendChild(tag("h5", "", plural(f.mainResults.length, "Main result")));
     f.mainResults.forEach((r) => {
-      const box = tag("div", "palo");
+      const row = tag("div", "palo");
       const head = tag("div", "palo-head");
       if (r.declaration) head.appendChild(tag("code", "", r.declaration));
-      box.appendChild(head);
+      row.appendChild(head);
       const bits = [r.file, typeof r.sorryCount === "number" && r.sorryCount > 0
         ? plural(r.sorryCount, "sorry", "sorries") : null].filter(Boolean);
       if (bits.length) {
         const line = tag("div", "palo-meta");
         line.appendChild(tag("span", "", bits.join(" · ")));
-        box.appendChild(line);
+        row.appendChild(line);
       }
-      host.appendChild(box);
+      host.appendChild(row);
     });
   }
 
   if (f.sources && f.sources.length) {
     host.appendChild(tag("h5", "", plural(f.sources.length, "Source")));
     f.sources.forEach((src) => {
-      const box = tag("div", "palo");
-      box.appendChild(tag("div", "palo-head", src.title || src.id || "untitled"));
+      const srcBox = tag("div", "palo");
+      srcBox.appendChild(tag("div", "palo-head", src.title || src.id || "untitled"));
       const line = tag("div", "palo-meta");
       line.appendChild(tag("span", "", [src.type, src.relationship].filter(Boolean).join(" · ")));
       // Only arXiv and DOI ids are dereferenceable; an ISBN or a bare string is not.
@@ -317,10 +349,12 @@ function formalizationSection(section, f, p) {
       } else if (src.id) {
         line.appendChild(tag("span", "", src.id));
       }
-      box.appendChild(line);
-      host.appendChild(box);
+      srcBox.appendChild(line);
+      host.appendChild(srcBox);
     });
   }
+
+  return box;
 }
 
 /* `sources[].id` is a free-text identifier in the schema. In the files seen so far it is
