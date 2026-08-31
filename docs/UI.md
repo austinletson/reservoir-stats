@@ -234,6 +234,33 @@ Two things follow that are easy to get wrong:
   would yank focus off the graph canvas mid-navigation, which is the thing docking exists
   to prevent.
 
+### Widen, for reading one package instead of comparing it
+
+A **Widen** button beside Close takes the docked panel from 440px to
+`min(980px, 62vw)` — enough for the whole of a `formalization.yaml` entry without
+scrolling past it in a 440px column. **Narrow** puts it back.
+
+Four details, each of which is the reason it is a class on `<body>` rather than a width on
+the panel:
+
+- The width is a CSS variable that both the panel and the body's `padding-right` read, so
+  one class moves both and the page is *reflowed* rather than covered. Widening never turns
+  the docked panel into an overlay.
+- It re-measures the canvas, twice, for the same reason opening the panel does: the
+  container is still mid-transition on the first call. Widening while the graph is open
+  visibly shrinks the graph and the graph keeps working.
+- The override is scoped inside the `min-width: 1000px` block. Below the breakpoint the
+  panel is already a 94vw overlay, so there is nothing to widen into; the button is hidden
+  there rather than left to do nothing.
+- At 980px a paragraph would run to about 140 characters, so prose and the fact grid are
+  held to `78ch`. The extra width is for the pill lists and the declaration boxes, which
+  use all of it.
+
+The label says what the button will do next rather than carrying `aria-pressed` with a
+fixed label: "Widen"/"Narrow" needs no second channel to be understood. Like the
+`formalization.yaml` box's open state, it lives in a module variable and not in the URL —
+it is how one reader wants to read, not something a shared link should impose.
+
 ## The graph
 
 Built, and it confirms the complaint the handoff raised against it. On real data 672 nodes
@@ -285,6 +312,8 @@ The load-bearing ones, all of which have been run against this build:
 | Panel for a package without one | no section, no badge, no empty heading |
 | Panel for a `v0.3` file with four keys | only those four rows, nothing rendered as "unknown" |
 | Collapsing the box, then moving the slider | stays collapsed, and stays collapsed for the next package opened |
+| Widen with the graph open | panel 440px → 930px at 1500px wide, canvas re-measures 995px → 505px, graph still live |
+| Widen below 1000px | button hidden, panel stays a 440px overlay |
 | Ranking callout share with filters on | ≤100% (it printed 1811% once) |
 | Slider back 12 months | composition, mix and both line charts all end at the same month |
 | Tabbable count, drawer closed | ~24, none of them inside the drawer |

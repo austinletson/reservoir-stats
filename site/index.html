@@ -218,7 +218,14 @@
 
 <div class="scrim" id="scrim"></div>
 <aside id="drawer" role="dialog" aria-labelledby="drawerTitle">
-  <button class="btn closex" id="closeDrawer" type="button">Close</button>
+  <div class="closex">
+    <!-- The label says what the button will do, rather than carrying aria-pressed with a
+         fixed label: "Widen"/"Narrow" needs no second channel to be understood. Hidden by
+         drawer.js below the docking breakpoint, where the panel is already near
+         full-width and there is nothing to widen into. -->
+    <button class="btn" id="wideDrawer" type="button">Widen</button>
+    <button class="btn" id="closeDrawer" type="button">Close</button>
+  </div>
   <div id="drawerBody"></div>
 </aside>
 <div class="tip" id="tip" role="status"></div>

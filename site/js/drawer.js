@@ -18,6 +18,9 @@ const MAX_PILLS = 30;
    persists nothing (see docs/UI.md), and this is a reading preference, not state worth
    putting in a shareable URL. */
 let fsecOpen = true;
+/* Whether the panel is widened. Module scope, like fsecOpen and for the same reason: it is
+   how one reader wants to read, not something a shared link should impose. */
+let wide = false;
 /* Palomar publishes no human-facing page per entry, so the record itself is the link.
    `path` is relative to the feed's host and comes from the feed. */
 const PALOMAR_HOST = "https://data.palomar-registry.org/";
@@ -29,6 +32,7 @@ export function initDrawer(handlers) {
   onNavigate = handlers.navigate;
   onClose = handlers.close;
   document.getElementById("closeDrawer").addEventListener("click", () => onClose());
+  document.getElementById("wideDrawer").addEventListener("click", () => setWide(!wide));
   document.getElementById("scrim").addEventListener("click", () => onClose());
   addEventListener("keydown", (e) => {
     if (e.key === "Escape" && isOpen()) onClose();
@@ -400,10 +404,27 @@ const DOCKED = matchMedia("(min-width: 1000px)");
 let onLayoutChange = () => {};
 export const setLayoutChangeHandler = (fn) => { onLayoutChange = fn; };
 
+/* Widen or narrow the docked panel.
+ *
+ * The width is a CSS variable read by both the panel and the body's padding, so one class
+ * on <body> moves both and the page reflows instead of being covered. onLayoutChange twice
+ * for the same reason showDrawer calls it twice: canvas charts size from their container,
+ * and the container is still mid-transition on the first call. */
+function setWide(next) {
+  wide = next;
+  document.body.classList.toggle("drawer-wide", wide);
+  document.getElementById("wideDrawer").textContent = wide ? "Narrow" : "Widen";
+  onLayoutChange();
+  setTimeout(onLayoutChange, 220);
+}
+
 function applyMode() {
   const open = isOpen();
   const drawer = document.getElementById("drawer");
   const docked = DOCKED.matches;
+  // Nothing to widen into when the panel is an overlay, so the control goes away rather
+  // than sitting there doing nothing.
+  document.getElementById("wideDrawer").classList.toggle("hidden", !docked);
   document.body.classList.toggle("drawer-docked", open && docked);
   document.getElementById("scrim").classList.toggle("on", open && !docked);
   document.querySelector(".wrap").inert = open && !docked;
