@@ -141,6 +141,8 @@ export function syncGraphControls() {
   // hide-orphans and re-layout only mean anything for the whole-graph layout.
   document.getElementById("allOnlyTools").classList.toggle("hidden", focus);
   document.getElementById("hideOrphans").setAttribute("aria-pressed", String(state.hideOrphans));
+  // Both graph modes, so not inside the #allOnlyTools toggle above.
+  document.getElementById("collapseMathlib").setAttribute("aria-pressed", String(state.collapseMathlib));
   document.getElementById("focusHint").classList.toggle("hidden", !focus);
   drawLegend();
 }

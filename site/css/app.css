@@ -46,9 +46,10 @@ button, select, input { font: inherit; color: inherit }
 
 /* One filter row, above everything, scoping every view below it. Never a filter
    inside a card — see 05-INTERACTION-SPEC.md § Scope. */
-/* Two rows, split on `inScope`: Scope changes which packages are counted, View does not.
+/* Two rows, split on `inScope`: Scope changes which packages are counted, Find does not.
    The split is the point — every control here used to be the same pill in the same row, so
-   Collapse Mathlib read as a filter when it removes nothing from any count. */
+   Hide Mathlib read as a filter when it removes nothing from any count. It has since moved
+   to the graph, the only view it changes. */
 .filters {
   display: flex; flex-direction: column; gap: 9px; margin: 14px 0 8px;
   padding: 11px 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;

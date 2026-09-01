@@ -13,7 +13,7 @@ export const state = {
   classes: new Set(CLASSES.map((c) => c.k)),
   collapseMathlib: false,
   /* Restrict scope to packages carrying a Palomar registry entry. A scope filter like
-     min stars, not a display toggle like Collapse Mathlib: it goes through inScope, so
+     min stars, not a display toggle like Hide Mathlib: it goes through inScope, so
      dependent counts stay measured over the whole graph. */
   palomarOnly: false,
   /* Restrict scope to packages carrying a formalization.yaml. A scope filter for the same
@@ -50,6 +50,7 @@ function serialise() {
   if (state.minStars) p.set("s", state.minStars);
   if (state.classes.size !== CLASSES.length) p.set("c", [...state.classes].join(","));
   if (state.topMetric !== "used") p.set("r", state.topMetric);
+  // `m` predates the rename to Hide Mathlib; kept so existing deep links still resolve.
   if (state.collapseMathlib) p.set("m", "1");
   if (state.palomarOnly) p.set("pl", "1");
   // `fz`, not `f`: `f` is already the graph's focused package.

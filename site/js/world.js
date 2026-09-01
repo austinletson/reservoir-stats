@@ -136,7 +136,7 @@ export function world(t) {
 }
 
 /* Display scope. Note what is NOT here: the search query, which is a finder rather than
-   a filter, and Collapse Mathlib, which applies only to the ranking. */
+   a filter, and Hide Mathlib, which edits the graph's drawing and nothing else. */
 export const inScope = (n) =>
   n.p.stars >= state.minStars
   && state.classes.has(n.k)

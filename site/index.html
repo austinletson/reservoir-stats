@@ -30,10 +30,11 @@
     </div>
 
     <!-- The app's controls, split on the one boundary that matters: the Scope row is
-         everything that goes through `inScope` and changes which packages are counted, the
-         View row is everything that does not. Collapse Mathlib sat among the scope chips
-         for a while, styled identically, which read as "drop Mathlib from the data" when
-         it does nothing of the kind. See docs/UI.md. -->
+         everything that goes through `inScope` and changes which packages are counted; the
+         Find row holds the search box, which is not a filter at all. Hide Mathlib used to
+         sit here too, styled like the scope chips, which read as "drop Mathlib from the
+         data" when it does nothing of the kind. It now lives in the graph's own controls,
+         the one view it changes. See docs/UI.md. -->
     <div class="filters">
       <div class="frow" role="group" aria-label="Scope — which packages are counted">
         <span class="flab" aria-hidden="true">Scope</span>
@@ -66,12 +67,9 @@
         </div>
       </div>
 
-      <div class="frow" role="group" aria-label="View — what is drawn, without changing the counts">
-        <span class="flab" aria-hidden="true">View</span>
+      <div class="frow" role="group" aria-label="Find — narrows the All packages table, and highlights elsewhere">
+        <span class="flab" aria-hidden="true">Find</span>
         <div class="fctl">
-        <button class="chip gchip" id="collapseMathlib" aria-pressed="false" type="button"
-          title="Drop Mathlib from the ranking and the graph so everything else gets the full scale. It has roughly 7x the dependents of the next package. Counts are not affected.">Collapse Mathlib</button>
-        <span class="vr"></span>
         <span style="position:relative">
           <input type="search" id="find" placeholder="Jump to a package…" aria-label="Jump to a package"
             autocomplete="off" role="combobox" aria-expanded="false" aria-controls="findList" aria-autocomplete="list">
@@ -113,7 +111,7 @@
           <div class="cardhead">
             <div>
               <h3>Mix over time</h3>
-              <p class="cap">Share of the ecosystem in each class, month by month, up to the selected date.</p>
+              <p class="cap">Share of the packages in scope in each class, month by month, up to the selected date.</p>
             </div>
             <div class="spacer"></div>
             <div class="seg" id="mixForm" role="group" aria-label="Mix chart form">
@@ -172,6 +170,14 @@
             <button data-g="all" aria-pressed="false"
               title="Every package at once. Shows that the ecosystem is a star around Mathlib, but most nodes carry no size information.">Everything</button>
           </div>
+          <!-- Lives here rather than in the page's control bar because the graph is the only
+               view it changes. It used to also drop Mathlib from the Overview ranking, which
+               did nothing for that chart's scale — drawTop already charts a runaway leader
+               separately — and only deleted the callout naming it. See docs/UI.md.
+               Outside #allOnlyTools on purpose: that group is hidden in focus mode, and
+               hiding Mathlib matters in both graph modes. -->
+          <button class="chip gchip" id="collapseMathlib" aria-pressed="false" type="button"
+            title="Remove Mathlib and its edges from the graph. It owns 47% of every edge and 71% of drawn nodes sit in its direct star, so the rest of the structure is hard to see with it in. Counts are not affected.">Hide Mathlib</button>
           <span id="allOnlyTools" style="display:flex;gap:8px;align-items:center">
             <button class="chip gchip" id="hideOrphans" aria-pressed="true" type="button"
               title="Packages with no edges in the current view form a meaningless ring of confetti around the graph. Hidden by default.">Hide packages with no edges</button>

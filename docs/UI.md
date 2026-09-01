@@ -84,16 +84,45 @@ Two labelled rows, and the split is not decoration:
 | Row | Contains | What it does |
 |---|---|---|
 | **Scope** | As of, Min stars, the four class chips, On Palomar, Has formalization.yaml | goes through `inScope`; changes which packages are counted |
-| **View** | Collapse Mathlib, Jump to a package | changes what is drawn; the counted set is untouched |
+| **Find** | Jump to a package | narrows the All packages table; dims or highlights elsewhere |
 
-Everything used to sit in one wrapping row as identical pills, with Collapse Mathlib
-between the class chips and On Palomar. That read as "drop Mathlib from the data", which is
-the opposite of what it does: it removes Mathlib from the ranking and the graph and leaves
-every count alone. Two controls that differ that fundamentally must not look the same.
+Everything used to sit in one wrapping row as identical pills, Hide Mathlib among them.
+That read as "drop Mathlib from the data", which is the opposite of what it does. It has
+since moved out of this bar entirely; see below.
 
-The search box is on the View row because it is a finder rather than a filter — it narrows
-the All packages table and only dims or highlights elsewhere, which the scope bar says when
-a query is active.
+### A control belongs to the view it changes
+
+Hide Mathlib (called Collapse Mathlib until it was measured) sat in the page's control bar
+for three views and earned its place in one:
+
+| View | What pressing it did |
+|---|---|
+| Graph | removed Mathlib and its 47% of all edges, and in focus mode re-centred on the next real hub |
+| Overview | deleted the ranking callout naming Mathlib, and revealed rank 13 |
+| All packages | nothing at all, while the scope bar asserted "Mathlib is excluded from the ranking" with `mathlib` sitting in row 1 |
+
+The Overview case is the interesting one. Its stated purpose is scale: one package with 7x
+the dependents of the next flattens every other bar. True, and `drawTop` already fixes it
+by charting a runaway leader in its own callout (`rows[0] >= rows[1] * 2.5`; Mathlib is 478
+against 78). **The bars never contained Mathlib either way**, so the filter could not
+improve the scale. Measured: callout `mathlib 478 dependents · 59% of every package` and 12
+bars with it off, no callout and 13 bars with it on. Information removed, not scale
+regained.
+
+So it now lives in the graph's own controls, beside the mode switch, and outside
+`#allOnlyTools` because hiding Mathlib matters in both graph modes where hide-orphans only
+matters in one. `renderRanking` filters nothing. The scope-bar sentence is graph-only and
+reads like the hide-orphans one next to it. The `m=1` hash key is kept through the rename so
+existing deep links resolve; on Overview or All packages it now correctly claims nothing.
+
+### "Share of the ecosystem" was a share of the scope
+
+`charts.js` computed `pct(v, total)` where `total` is the **scoped** count, then labelled it
+"of the ecosystem", in the composition bar tooltip, the donut tooltip, and the mix-over-time
+caption. Under the formalization.yaml filter that printed `1 pkgs · 50% of the ecosystem`
+for a package that is 0.1% of the ecosystem. All three now say "of packages in scope",
+which is what the number is in every case, filtered or not. Same family as the 1811%
+callout below: a denominator that quietly changed identity under a filter.
 
 Two layout details worth keeping: each row is a grid with the label in its own column, so a
 Scope row that wraps indents its second line under the controls rather than sliding back
@@ -338,7 +367,9 @@ The load-bearing ones, all of which have been run against this build:
 | Widen with the graph open | panel 440px → 930px at 1500px wide, canvas re-measures 995px → 505px, graph still live |
 | Widen below 1000px | button hidden, panel stays a 440px overlay |
 | Ranking callout share with filters on | ≤100% (it printed 1811% once) |
-| Every control after the Scope/View split | class chip 808→626, min stars 100+ →62, slider back 6 months →59 of 596, Collapse Mathlib and the two attribute chips all still write their hash keys |
+| Every control after the Scope/Find split | class chip 808→626, min stars 100+ →62, slider back 6 months →59 of 596, both attribute chips still write their hash keys |
+| Hide Mathlib, per view | visible and effective only on Graph; hidden on Overview and All packages, where `#m=1` changes nothing and claims nothing |
+| Composition tooltips under a filter | "% of packages in scope", never "of the ecosystem" |
 | Slider back 12 months | composition, mix and both line charts all end at the same month |
 | Tabbable count, drawer closed | ~24, none of them inside the drawer |
 | Tabbable count, panel open, below 1000px | zero outside the panel, `inert` and `aria-modal` set |

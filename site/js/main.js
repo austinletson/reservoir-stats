@@ -11,7 +11,7 @@ import { pushHash, readHash, setMonthCount, state, syncHash } from "./state.js";
 import { buildGraph, draw as drawGraph, initGraph, reheat, resizeCanvas, syncGraphControls } from "./graph.js";
 import { drawAllTable } from "./table.js";
 import {
-  BY_ID, counts, FORMALIZATION_N, growth, init, MATHLIB, matchesQuery, meta, mixSeries,
+  BY_ID, counts, FORMALIZATION_N, growth, init, matchesQuery, meta, mixSeries,
   MONTHS, NM, PALOMAR_N, PKGS, prevYear, rollup, scopedAt, world,
 } from "./world.js";
 
@@ -172,10 +172,10 @@ function renderScopeBar(keep, w, total) {
       + " Each file is the project's own claim about its own work, and most repositories"
       + " carry no such file whatever they formalize.");
   }
-  if (state.collapseMathlib) {
-    parts.push(state.view === "graph"
-      ? " Mathlib is excluded from the graph and the ranking."
-      : " Mathlib is excluded from the ranking.");
+  // Graph-only, because the graph is the only view it changes. Reads like the hide-orphans
+  // sentence above it, which is the other control that edits the drawing and nothing else.
+  if (state.view === "graph" && state.collapseMathlib) {
+    parts.push(" Mathlib and its edges are excluded from the graph.");
   }
   parts.push(" Dependency counts are always measured against the full graph, so filters change what you see, never what the numbers mean.");
   sb.append(strong, document.createTextNode(parts.join("")));
@@ -210,10 +210,13 @@ function renderKpis(keep, c, total, roll) {
 
 function renderRanking(keep, w) {
   const prevT = prevYear();
-  // Collapse Mathlib removes it from the ranking only — never from the counts, which is
-  // why this filters the display pool rather than the world.
-  const pool = [...keep.values()].filter((n) => !(state.collapseMathlib && n.p.id === MATHLIB));
-  const rows = pool.map((n) => ({
+  /* Nothing is filtered out of this pool, deliberately. Hide Mathlib used to remove it
+     here, on the theory that one package with 7x the dependents of the next flattens every
+     other bar. It does, and `drawTop` already fixes it by charting a runaway leader in its
+     own callout, so the only thing the filter achieved was deleting the callout that names
+     Mathlib and states its 478 dependents. That is information removed, not scale
+     regained. See docs/UI.md. */
+  const rows = [...keep.values()].map((n) => ({
     id: n.p.id,
     name: n.p.name,
     owner: n.p.owner,
@@ -322,7 +325,6 @@ function syncControls() {
   // Without aria-valuetext, assistive tech announces "25 of 33" instead of a date.
   $("asof").setAttribute("aria-valuetext", MONTHS[state.asof]);
   $("minstars").value = String(state.minStars);
-  $("collapseMathlib").setAttribute("aria-pressed", String(state.collapseMathlib));
   $("palomarOnly").setAttribute("aria-pressed", String(state.palomarOnly));
   $("formalizationOnly").setAttribute("aria-pressed", String(state.formalizationOnly));
   syncGraphControls();
@@ -351,6 +353,8 @@ function wireControls() {
     render();
   });
 
+  /* A graph control, wired here rather than in graph.js with the others, because it is the
+     only one that changes a scope-bar sentence and render() is what writes that. */
   $("collapseMathlib").addEventListener("click", (e) => {
     state.collapseMathlib = !state.collapseMathlib;
     e.currentTarget.setAttribute("aria-pressed", String(state.collapseMathlib));
