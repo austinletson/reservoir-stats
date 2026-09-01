@@ -11,6 +11,16 @@ import { state } from "./state.js";
 import { adoption, BY_ID, dependentsOf, MONTHS, world } from "./world.js";
 
 const MAX_PILLS = 30;
+/* Whether the formalization.yaml box is expanded, remembered for the session.
+   The drawer body is rebuilt from scratch on every render — moving the month slider with
+   the panel open is enough — so without this, collapsing the box and then touching the
+   slider silently re-expands it. Module scope, not localStorage: the app deliberately
+   persists nothing (see docs/UI.md), and this is a reading preference, not state worth
+   putting in a shareable URL. */
+let fsecOpen = true;
+/* Whether the panel is widened. Module scope, like fsecOpen and for the same reason: it is
+   how one reader wants to read, not something a shared link should impose. */
+let wide = false;
 /* Palomar publishes no human-facing page per entry, so the record itself is the link.
    `path` is relative to the feed's host and comes from the feed. */
 const PALOMAR_HOST = "https://data.palomar-registry.org/";
@@ -22,6 +32,7 @@ export function initDrawer(handlers) {
   onNavigate = handlers.navigate;
   onClose = handlers.close;
   document.getElementById("closeDrawer").addEventListener("click", () => onClose());
+  document.getElementById("wideDrawer").addEventListener("click", () => setWide(!wide));
   document.getElementById("scrim").addEventListener("click", () => onClose());
   addEventListener("keydown", (e) => {
     if (e.key === "Escape" && isOpen()) onClose();
@@ -103,6 +114,15 @@ export function renderDrawer(id) {
     b5.style.color = cssv("--good");
     meta.appendChild(b5);
   }
+  /* `sorry_count: 0` is the one thing in formalization.yaml that a reader scanning the
+     panel wants first, so it is a badge and not a row in the section below. Silence is
+     not zero: a file that declares no count gets the plain badge, never "no sorry". */
+  const f = p.formalization;
+  if (f) {
+    const b6 = tag("span", "badge", f.sorryCount === 0 ? "formalization.yaml, no sorry" : "formalization.yaml");
+    b6.style.color = cssv(f.sorryCount === 0 ? "--good" : "--ink2");
+    meta.appendChild(b6);
+  }
   body.appendChild(meta);
 
   const dl = tag("dl", "facts");
@@ -119,9 +139,9 @@ export function renderDrawer(id) {
   fact("Toolchain", release || "unknown");
   body.appendChild(dl);
 
-  const section = (title, cap) => {
+  const section = (title, cap, h4cls) => {
     const s = tag("div", "dsec");
-    const h4 = tag("h4", "", title);
+    const h4 = tag("h4", h4cls || "", title);
     const c = tag("p", "cap", cap);
     c.style.cssText = "color:var(--muted);margin:0 0 6px";
     const host = tag("div");
@@ -141,6 +161,14 @@ export function renderDrawer(id) {
       + "feed carries recent registrations only, so this may not be all of them.",
     );
     palomar.forEach((e) => palHost.appendChild(palomarEntry(e)));
+  }
+
+  /* formalization.yaml, next to Palomar because they answer the same question from
+     opposite ends: Palomar is a third party's record of a verified result, this is the
+     project's own declaration of what it set out to prove and how far it got.
+     Self-reported, which the caption has to say out loud. */
+  if (f) {
+    body.appendChild(formalizationSection(f, p));
   }
 
   /* Adoption. The "+N in the last 12 months" in the caption is the point: a cumulative
@@ -201,6 +229,148 @@ function palomarEntry(e) {
   return box;
 }
 
+/* One formalization.yaml, as a claim (scope), a completeness line (sorry, axioms), the
+   declarations it names, and what it formalizes (sources). Every part is optional: the
+   schema requires four keys and the files in the wild fill in wildly different subsets,
+   so anything absent is simply not drawn rather than drawn as "unknown". */
+function formalizationSection(f, p) {
+  /* A <details>, so collapsing needs no state of its own: the drawer is rebuilt on every
+     render and a JS toggle would have to be re-applied or remembered, which this app has
+     nowhere to put (no localStorage, by design). Open by default — the whole point of
+     fetching the file is to show it — and native, so Enter and Space work for free.
+
+     Fenced in its own box rather than styled like the sections around it. Everything else
+     on the panel is measured from the index; every word in here is copied from a file in
+     the package's own repository, and a reader has to be able to see where one stops and
+     the other starts. */
+  const box = tag("details", "dsec fsec");
+  box.open = fsecOpen;
+  box.addEventListener("toggle", () => { fsecOpen = box.open; });
+
+  const sum = tag("summary");
+  sum.append(
+    tag("h4", "file", "formalization.yaml"),
+    tag("span", "fsec-from", "self-reported"),
+  );
+  box.appendChild(sum);
+
+  const cap = tag("p", "cap",
+    "Copied from the file in the package's own repository"
+    + (f.version ? `, to schema ${f.version}` : "") + ". Read as a claim, not a check.");
+  cap.style.cssText = "color:var(--muted);margin:0 0 6px";
+  box.appendChild(cap);
+
+  const host = tag("div");
+  box.appendChild(host);
+
+  /* A link to the file itself, because every claim below is checkable only against it.
+     Labelled "View the file" rather than repeating the name a third time in four lines,
+     the heading and the caption having said it already. `HEAD` rather than a branch name:
+     the summary carries no default branch, and GitHub resolves HEAD to whatever it is. */
+  const src = tag("div");
+  src.style.cssText = "margin:0 0 8px;font-size:12.5px";
+  const a = tag("a", "", "View the file ↗");
+  a.href = (p.repoUrl || "https://github.com/" + p.id).replace(/\/$/, "")
+    + "/blob/HEAD/formalization.yaml";
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  src.appendChild(a);
+  host.appendChild(src);
+
+  if (f.description && f.description !== p.description) {
+    const d = tag("p", "", f.description);
+    d.style.cssText = "margin:0 0 8px;font-size:12.5px;color:var(--ink2)";
+    host.appendChild(d);
+  }
+
+  const dl = tag("dl", "facts");
+  const fact = (k, v) => dl.append(tag("dt", "", k), tag("dd", "", v));
+  // The file names the project, which is often the paper's title rather than the package's
+  // name. Shown only when it differs, or it is a row that repeats the panel's own heading.
+  if (f.name && f.name !== p.name) fact("Declared name", f.name);
+  // Absent and zero say different things, so only a declared count is shown as a number.
+  if (typeof f.sorryCount === "number") {
+    fact("Sorry", f.sorryCount === 0
+      ? "none declared"
+      : plural(f.sorryCount, "sorry", "sorries")
+        + (f.sorryInDefinitions ? `, ${f.sorryInDefinitions} in definitions` : ""));
+  }
+  if (f.axioms && f.axioms.length) fact("Axioms", f.axioms.join(", "));
+  if (f.role) fact("Repository role", f.role.replace(/-/g, " "));
+  if (f.automation && f.automation.length) fact("Produced by", f.automation.join(", "));
+  if (f.review) fact("Review", f.review);
+  if (f.license) fact("Declared license", f.license);
+  if (f.authors && f.authors.length) {
+    fact("Authors", f.authors.length > 6
+      ? `${f.authors.slice(0, 6).join(", ")} +${f.authors.length - 6} more`
+      : f.authors.join(", "));
+  }
+  const subjects = [...(f.arxiv || []), ...(f.msc2020 || [])];
+  if (subjects.length) fact("Classified", subjects.join(", "));
+  if (dl.childElementCount) host.appendChild(dl);
+
+  if (f.scope) {
+    const sc = tag("p", "", f.scope);
+    sc.style.cssText = "margin:8px 0 0;font-size:12.5px;color:var(--ink2)";
+    host.append(tag("h5", "", "Scope"), sc);
+  }
+
+  /* The declarations are the substance: a named theorem in a named file is the one part
+     of this file a reader can go and check for themselves. */
+  if (f.mainResults && f.mainResults.length) {
+    host.appendChild(tag("h5", "", plural(f.mainResults.length, "Main result")));
+    f.mainResults.forEach((r) => {
+      const row = tag("div", "palo");
+      const head = tag("div", "palo-head");
+      if (r.declaration) head.appendChild(tag("code", "", r.declaration));
+      row.appendChild(head);
+      const bits = [r.file, typeof r.sorryCount === "number" && r.sorryCount > 0
+        ? plural(r.sorryCount, "sorry", "sorries") : null].filter(Boolean);
+      if (bits.length) {
+        const line = tag("div", "palo-meta");
+        line.appendChild(tag("span", "", bits.join(" · ")));
+        row.appendChild(line);
+      }
+      host.appendChild(row);
+    });
+  }
+
+  if (f.sources && f.sources.length) {
+    host.appendChild(tag("h5", "", plural(f.sources.length, "Source")));
+    f.sources.forEach((src) => {
+      const srcBox = tag("div", "palo");
+      srcBox.appendChild(tag("div", "palo-head", src.title || src.id || "untitled"));
+      const line = tag("div", "palo-meta");
+      line.appendChild(tag("span", "", [src.type, src.relationship].filter(Boolean).join(" · ")));
+      // Only arXiv and DOI ids are dereferenceable; an ISBN or a bare string is not.
+      const href = sourceHref(src.id);
+      if (href) {
+        const a = tag("a", "", "Source ↗");
+        a.href = href;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        line.appendChild(a);
+      } else if (src.id) {
+        line.appendChild(tag("span", "", src.id));
+      }
+      srcBox.appendChild(line);
+      host.appendChild(srcBox);
+    });
+  }
+
+  return box;
+}
+
+/* `sources[].id` is a free-text identifier in the schema. In the files seen so far it is
+   an arXiv URL, a DOI, or an ISBN, and only the first two resolve to anything. */
+function sourceHref(id) {
+  if (!id) return null;
+  if (/^https?:\/\//.test(id)) return id;
+  if (/^10\.\d{4,}\//.test(id)) return "https://doi.org/" + id;
+  if (/^arxiv:/i.test(id)) return "https://arxiv.org/abs/" + id.slice(6).trim();
+  return null;
+}
+
 function muted(text) {
   const s = tag("span", "", text);
   s.style.color = "var(--muted)";
@@ -234,10 +404,27 @@ const DOCKED = matchMedia("(min-width: 1000px)");
 let onLayoutChange = () => {};
 export const setLayoutChangeHandler = (fn) => { onLayoutChange = fn; };
 
+/* Widen or narrow the docked panel.
+ *
+ * The width is a CSS variable read by both the panel and the body's padding, so one class
+ * on <body> moves both and the page reflows instead of being covered. onLayoutChange twice
+ * for the same reason showDrawer calls it twice: canvas charts size from their container,
+ * and the container is still mid-transition on the first call. */
+function setWide(next) {
+  wide = next;
+  document.body.classList.toggle("drawer-wide", wide);
+  document.getElementById("wideDrawer").textContent = wide ? "Narrow" : "Widen";
+  onLayoutChange();
+  setTimeout(onLayoutChange, 220);
+}
+
 function applyMode() {
   const open = isOpen();
   const drawer = document.getElementById("drawer");
   const docked = DOCKED.matches;
+  // Nothing to widen into when the panel is an overlay, so the control goes away rather
+  // than sitting there doing nothing.
+  document.getElementById("wideDrawer").classList.toggle("hidden", !docked);
   document.body.classList.toggle("drawer-docked", open && docked);
   document.getElementById("scrim").classList.toggle("on", open && !docked);
   document.querySelector(".wrap").inert = open && !docked;

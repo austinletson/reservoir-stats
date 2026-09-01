@@ -14,9 +14,14 @@ What the index cannot tell us is when a package *entered the registry* — see
 `first_seen.py`, which mines that from the index repo's git history and writes
 `data/first-seen.json`. This script reads that file.
 
-One thing here does not come from the index: Palomar registry entries, fetched from
-`data.palomar-registry.org` and attached to the package whose repository they cite. That
-fetch fails soft — see `fetch_palomar`.
+Two things here do not come from the index, and both fail soft so that a third party
+being down cannot turn the daily build red:
+
+- Palomar registry entries, fetched from `data.palomar-registry.org` and attached to the
+  package whose repository they cite. See `fetch_palomar`.
+- `formalization.yaml`, read from each package's own repository through the GitHub API.
+  Only repositories the index says have been pushed to since the last build are asked,
+  so a nightly run costs ~10 requests rather than 808. See `fetch_formalizations`.
 
 Output: `site/data/summary.json`. See `docs/DATA.md` for the shape and for where it
 extends the front-end handoff's contract.
@@ -26,8 +31,11 @@ Usage:
     python3 reservoir_stats.py --refresh           # re-download the index first
     python3 reservoir_stats.py --index-dir ~/src/reservoir-index
     python3 reservoir_stats.py --out site/data/summary.json
+    python3 reservoir_stats.py --no-formalization      # skip the GitHub sweep entirely
 
-Standard library only.
+Requires PyYAML (`pip install -r requirements.txt`) to read `formalization.yaml`.
+Everything else is standard library. Set `GITHUB_TOKEN` or `GH_TOKEN` before a cold run:
+unauthenticated GitHub allows 60 requests an hour, and a cold run needs one per package.
 """
 
 from __future__ import annotations
@@ -35,11 +43,16 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import sys
+import urllib.error
 import urllib.request
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Iterable
+
+import yaml
 
 from reservoir_deps import (
     DEFAULT_CACHE,
@@ -56,6 +69,18 @@ from reservoir_deps import (
 MATHLIB_ID = "leanprover-community/mathlib"
 STALE_MONTHS = 12
 PALOMAR_URL = "https://data.palomar-registry.org/recent.json"
+
+# formalization.yaml, read from each package's own repository. The schema lives at
+# github.com/mathlib-initiative/formalization.yaml; `formalization_record` keeps a subset.
+GITHUB_HOST = "github.com/"
+GITHUB_CONTENTS = "https://api.github.com/repos/{slug}/contents/formalization.yaml"
+FETCH_WORKERS = 8
+# The largest file seen in the index is 44KB. The cap is there so one repository cannot
+# make the build hold an arbitrary download in memory, not because 200KB is meaningful.
+MAX_FILE_BYTES = 256 * 1024
+MAX_MAIN_RESULTS = 20
+MAX_SOURCES = 10
+UNAUTH_MAX_REQUESTS = 50
 
 
 # --------------------------------------------------------------------------- months
@@ -341,6 +366,312 @@ def fetch_palomar(url: str = PALOMAR_URL) -> dict[str, list[dict[str, Any]]]:
     return by_repo
 
 
+# ------------------------------------------------------------------- formalization.yaml
+
+
+def github_slug(pkg: IndexedPackage) -> str | None:
+    """`owner/name`, or None for anything not on github.com.
+
+    Uses `repo_key`, the same normalised URL `first_seen.py` keys its tables with, so a
+    repo whose id moved between `sources[]` entries is still found. Every one of the 808
+    indexed packages is on github.com today; the guard is for the day one is not.
+    """
+    key = pkg.repo_key or ""
+    if not key.startswith(GITHUB_HOST):
+        return None
+    slug = key[len(GITHUB_HOST):]
+    return slug if slug.count("/") == 1 and all(slug.split("/")) else None
+
+
+def _texts(value: Any, limit: int = 64) -> list[str]:
+    """A YAML sequence of scalars as a list of non-empty strings.
+
+    The schema says "array" and the files in the wild write both `authors: [A, B]` and a
+    block list, and occasionally a bare string where a list belongs. All three arrive
+    here as the same thing rather than as a type error that loses the whole file.
+    """
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        value = [value]
+    out = []
+    for item in value:
+        if isinstance(item, (str, int, float)):
+            text = str(item).strip()
+            if text:
+                out.append(text)
+    return out[:limit]
+
+
+def _text(value: Any) -> str | None:
+    if isinstance(value, (str, int, float)):
+        text = str(value).strip()
+        return text or None
+    return None
+
+
+def _count(value: Any) -> int | None:
+    """`sorry_count: 0` is the whole point of the field, so 0 must survive as 0."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+        return int(value.strip())
+    return None
+
+
+def formalization_record(text: str) -> dict[str, Any] | None:
+    """The subset of one formalization.yaml worth putting in the site's payload.
+
+    NOT the whole file. The 22 files in the index today total ~250KB of YAML against a
+    398KB summary.json, and most of that is prose the site has nowhere to show: per-source
+    notes, tool_setup, prompting_notes, fidelity divergences. What is kept is what a
+    reader of a package panel can act on — what it claims to prove, how completely, and
+    against which paper.
+
+    `safe_load` and never `load`: this is third-party content fetched over the network.
+
+    Returns None for a file that is not a YAML mapping. The schema
+    (github.com/mathlib-initiative/formalization.yaml) requires `project`, `sources`,
+    `automation` and `review`, but this does not validate — a file missing half of them
+    still tells the reader something true, and rejecting it would just hide a package.
+    """
+    try:
+        doc = yaml.safe_load(text)
+    except yaml.YAMLError:
+        return None
+    if not isinstance(doc, dict):
+        return None
+
+    project = doc.get("project") if isinstance(doc.get("project"), dict) else {}
+    status = doc.get("status") if isinstance(doc.get("status"), dict) else {}
+    classification = doc.get("classification") if isinstance(doc.get("classification"), dict) else {}
+    automation = doc.get("automation") if isinstance(doc.get("automation"), dict) else {}
+    repository = doc.get("repository") if isinstance(doc.get("repository"), dict) else {}
+    review = doc.get("review") if isinstance(doc.get("review"), dict) else {}
+
+    methods = []
+    for entry in automation.get("methods") or []:
+        if isinstance(entry, dict):
+            methods.extend(_texts(entry.get("method")))
+        else:
+            methods.extend(_texts(entry))
+
+    sources = []
+    for entry in doc.get("sources") or []:
+        if not isinstance(entry, dict):
+            continue
+        sources.append(
+            {
+                "title": _text(entry.get("title")),
+                "id": _text(entry.get("id")),
+                "type": _text(entry.get("type")),
+                "relationship": _text(entry.get("relationship")),
+            }
+        )
+
+    results = []
+    for entry in status.get("main_results") or []:
+        if not isinstance(entry, dict):
+            continue
+        results.append(
+            {
+                "declaration": _text(entry.get("declaration")),
+                "file": _text(entry.get("file")),
+                "sorryCount": _count(entry.get("sorry_count")),
+            }
+        )
+
+    record = {
+        "version": _text(doc.get("version")),
+        "name": _text(project.get("name")),
+        "description": _text(project.get("description")),
+        "authors": _texts(project.get("authors")),
+        "license": _text(project.get("license")),
+        "role": _text(repository.get("role")),
+        "scope": _text(status.get("scope")),
+        "sorryCount": _count(status.get("sorry_count")),
+        "sorryInDefinitions": _count(status.get("sorry_in_definitions")),
+        "axioms": _texts(status.get("axioms")),
+        "mainResults": results[:MAX_MAIN_RESULTS],
+        "sources": sources[:MAX_SOURCES],
+        "arxiv": _texts(classification.get("arxiv")),
+        "msc2020": _texts(classification.get("msc2020")),
+        "automation": sorted(set(methods)),
+        "review": _text(review.get("status")),
+    }
+    # Absent rather than null, one key at a time: this file is the site's whole payload
+    # and two thirds of these keys are unset in a typical file.
+    return {k: v for k, v in record.items() if v not in (None, [], "")}
+
+
+class _FormalizationCache:
+    """Per-repo state that survives between nightly builds.
+
+    Two keys per repo, and both matter:
+
+    - `updatedAt` is the index's own view of the repo's last push. It gates whether the
+      repo is asked about at all, which is what keeps a nightly build at ~10 requests
+      instead of 808. It is refreshed on Reservoir's crawl schedule, not GitHub's, so a
+      file added today is picked up whenever the index next notices the push. That lag is
+      the price of not spending 808 requests a night; see docs/DATA.md.
+    - `etag` makes the request itself free when the repo *was* pushed but the file did not
+      change. GitHub does not count a 304 against the rate limit.
+
+    A missing or unreadable cache is not an error. It costs one full sweep, which is 808
+    requests against a 5,000/hour budget, and then the next build is cheap again.
+    """
+
+    SCHEMA = 1
+
+    def __init__(self, path: Path):
+        self.path = path
+        self.repos: dict[str, dict[str, Any]] = {}
+        data = None
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as err:
+                print(f"warning: ignoring unreadable {path}: {err}", file=sys.stderr)
+        if isinstance(data, dict) and data.get("schema") == self.SCHEMA:
+            repos = data.get("repos")
+            if isinstance(repos, dict):
+                self.repos = {k: v for k, v in repos.items() if isinstance(v, dict)}
+
+    def write(self, seen: set[str]) -> None:
+        # Drop repos that left the index, so the file cannot grow forever.
+        self.repos = {k: v for k, v in self.repos.items() if k in seen}
+        payload = {
+            "schema": self.SCHEMA,
+            "checkedAt": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "repos": dict(sorted(self.repos.items())),
+        }
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps(payload, separators=(",", ":")) + "\n", encoding="utf-8")
+        except OSError as err:
+            # A build that cannot write its cache is slower next time, not wrong.
+            print(f"warning: could not write {self.path}: {err}", file=sys.stderr)
+
+
+def _fetch_one(slug: str, etag: str | None, token: str | None) -> tuple[str, int, str | None, str | None]:
+    """(slug, status, etag, body). status -1 means the request itself failed."""
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/vnd.github.raw",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if etag:
+        headers["If-None-Match"] = etag
+    req = urllib.request.Request(GITHUB_CONTENTS.format(slug=slug), headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read(MAX_FILE_BYTES + 1).decode("utf-8", "replace")
+            return slug, resp.status, resp.headers.get("ETag"), body
+    except urllib.error.HTTPError as err:
+        # 304 is the happy path for an unchanged file and 404 is the answer for most
+        # repos, so neither is exceptional here despite arriving as an exception.
+        return slug, err.code, err.headers.get("ETag") if err.headers else None, None
+    except Exception as err:  # network, DNS, timeout, TLS
+        print(f"warning: {slug}: {err}", file=sys.stderr)
+        return slug, -1, None, None
+
+
+def fetch_formalizations(
+    packages: Iterable[IndexedPackage],
+    cache_path: Path,
+    token: str | None,
+    stats: Counter,
+) -> dict[str, dict[str, Any]]:
+    """Read `formalization.yaml` from each package's repository, incrementally.
+
+    The file is a project-level declaration of what a Lean repository formalizes, to the
+    schema at github.com/mathlib-initiative/formalization.yaml. Nothing in the Reservoir
+    index carries it, so it has to come from the repositories themselves; 22 of the 808
+    indexed packages had one when this was written.
+
+    Fails soft, for the same reason `fetch_palomar` does: GitHub being slow or rate-limited
+    must not turn the daily build red. Every repo that fails keeps whatever the cache
+    already held, and a build with nothing at all just hides the feature.
+
+    Returns {slug: record} for repos that have a usable file.
+    """
+    slugs: dict[str, str | None] = {}
+    for pkg in packages:
+        slug = github_slug(pkg)
+        if slug:
+            slugs[slug] = pkg.meta.get("updatedAt")
+
+    cache = _FormalizationCache(cache_path)
+    todo: list[tuple[str, str | None]] = []
+    for slug, updated in sorted(slugs.items()):
+        cached = cache.repos.get(slug)
+        # The gate: a repo nobody has pushed to since we last looked cannot have gained,
+        # lost or changed the file.
+        if cached and cached.get("updatedAt") == updated and "record" in cached:
+            stats["formalization_repos_unchanged"] += 1
+            continue
+        todo.append((slug, (cached or {}).get("etag")))
+
+    # Unauthenticated GitHub allows 60 requests an hour. A cold sweep is 808, so it would
+    # rate-limit two thirds of the way in and produce a summary that says some packages
+    # have no file when nobody actually looked. Refusing to start is the honest failure.
+    if todo and not token and len(todo) > UNAUTH_MAX_REQUESTS:
+        print(
+            f"warning: {len(todo)} repositories to check and no GitHub token "
+            "(GITHUB_TOKEN or GH_TOKEN). Unauthenticated GitHub allows 60 requests an "
+            "hour, so formalization.yaml data is being skipped entirely rather than "
+            "half-collected.",
+            file=sys.stderr,
+        )
+        stats["formalization_skipped_no_token"] = len(todo)
+        todo = []
+
+    if todo:
+        with ThreadPoolExecutor(max_workers=FETCH_WORKERS) as pool:
+            results = pool.map(lambda item: _fetch_one(item[0], item[1], token), todo)
+            for slug, status, etag, body in results:
+                entry = cache.repos.setdefault(slug, {})
+                if status == 200 and body is not None:
+                    if len(body.encode("utf-8", "ignore")) > MAX_FILE_BYTES:
+                        print(f"warning: {slug}: formalization.yaml over "
+                              f"{MAX_FILE_BYTES} bytes, ignored", file=sys.stderr)
+                        entry["record"] = None
+                        stats["formalization_oversized"] += 1
+                    else:
+                        record = formalization_record(body)
+                        entry["record"] = record
+                        if record is None:
+                            stats["formalization_unparseable"] += 1
+                        else:
+                            stats["formalization_fetched"] += 1
+                    entry["etag"] = etag
+                    entry["updatedAt"] = slugs[slug]
+                elif status == 304:
+                    stats["formalization_unmodified"] += 1
+                    entry["updatedAt"] = slugs[slug]
+                elif status == 404:
+                    entry["record"] = None
+                    entry["etag"] = None
+                    entry["updatedAt"] = slugs[slug]
+                    stats["formalization_absent"] += 1
+                else:
+                    # Rate limit, 5xx, or the request never landed. Leave `updatedAt`
+                    # alone so the next build retries this repo instead of trusting a
+                    # gap it never confirmed.
+                    stats["formalization_errors"] += 1
+
+    cache.write(set(slugs))
+    return {
+        slug: entry["record"]
+        for slug, entry in cache.repos.items()
+        if isinstance(entry.get("record"), dict)
+    }
+
+
 # --------------------------------------------------------------------------- summary
 
 
@@ -350,8 +681,12 @@ def build_summary(
     first_seen: FirstSeen,
     index_head: str | None,
     palomar: dict[str, list[dict[str, Any]]],
+    formalizations: dict[str, dict[str, Any]],
+    stats: Counter | None = None,
 ) -> dict[str, Any]:
-    stats: Counter = Counter()
+    # The caller passes its own counter when it has already counted something — the
+    # formalization sweep records how many repos it asked about before this runs.
+    stats = Counter() if stats is None else stats
 
     today = dt.datetime.now(dt.timezone.utc).date()
     last_ord = month_ord(today.year, today.month)
@@ -412,6 +747,14 @@ def build_summary(
             stats["packages_with_palomar"] += 1
             stats["palomar_entries_matched"] += len(entries)
 
+        # Keyed on the repository rather than the index path, because the file lives in
+        # the repository and the two names differ (`mathlib4` is indexed as `mathlib`).
+        formalization = formalizations.get(github_slug(pkg) or "")
+        if formalization:
+            stats["packages_with_formalization"] += 1
+            if formalization.get("sorryCount") == 0:
+                stats["formalization_sorry_free"] += 1
+
         record: dict[str, Any] = {
             "id": pkg.full_name,
             "owner": pkg.owner,
@@ -436,6 +779,8 @@ def build_summary(
         # file is the site's whole payload.
         if entries:
             record["palomar"] = entries
+        if formalization:
+            record["formalization"] = formalization
         out.append(record)
 
     out.sort(key=lambda p: p["id"].lower())
@@ -448,6 +793,9 @@ def build_summary(
     stats["palomar_entries_in_feed"] = sum(len(v) for v in palomar.values())
     stats["palomar_entries_matched"] += 0
     stats["packages_with_palomar"] += 0
+    # Always present, so "nobody has one" reads as zero rather than as a missing feature.
+    stats["packages_with_formalization"] += 0
+    stats["formalization_sorry_free"] += 0
 
     return {
         "generatedAt": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -456,6 +804,7 @@ def build_summary(
             "indexHead": index_head,
             "firstSeenHeadDate": first_seen.head_date,
             "palomar": PALOMAR_URL,
+            "formalizationSchema": "https://github.com/mathlib-initiative/formalization.yaml",
         },
         "months": [label_of_ord(start_ord + i) for i in range(n_months)],
         "monthKeys": [key_of_ord(start_ord + i) for i in range(n_months)],
@@ -493,6 +842,21 @@ def check_invariants(summary: dict[str, Any]) -> list[str]:
         ats = [at for at, _ in p["depsHistory"]]
         if ats != sorted(ats) or len(set(ats)) != len(ats):
             problems.append(f"{p['id']}: depsHistory change points not strictly increasing")
+
+        # formalization.yaml is third-party YAML, so the shape the front end reads is
+        # asserted here rather than hoped for. A file that says `authors: {a: b}` must not
+        # reach the drawer as something it will try to iterate.
+        f = p.get("formalization")
+        if f is not None:
+            if not isinstance(f, dict):
+                problems.append(f"{p['id']}: formalization is {type(f).__name__}, not an object")
+                continue
+            for key in ("authors", "axioms", "arxiv", "msc2020", "automation", "sources", "mainResults"):
+                if key in f and not isinstance(f[key], list):
+                    problems.append(f"{p['id']}: formalization.{key} is not a list")
+            for key in ("sorryCount", "sorryInDefinitions"):
+                if key in f and not isinstance(f[key], int):
+                    problems.append(f"{p['id']}: formalization.{key} is not an integer")
     return problems
 
 
@@ -515,6 +879,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--out", type=Path, default=Path("site/data/summary.json"), help="where to write"
+    )
+    parser.add_argument(
+        "--no-formalization",
+        action="store_true",
+        help="skip reading formalization.yaml from package repositories over the GitHub API",
     )
     parser.add_argument("--quiet", action="store_true", help="skip the summary report")
     args = parser.parse_args(argv)
@@ -539,12 +908,27 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"no packages found under {index_dir}")
     resolver = Resolver([p.as_resolver_package() for p in packages], index_dir)
 
+    stats: Counter = Counter()
+    formalizations: dict[str, dict[str, Any]] = {}
+    if not args.no_formalization:
+        formalizations = fetch_formalizations(
+            packages,
+            # Beside the index checkout rather than inside it: `--refresh` deletes that
+            # directory, and losing the ETags on every index refresh would mean a full
+            # 808-request sweep every night.
+            args.cache_dir.expanduser().parent / "formalization.json",
+            os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN"),
+            stats,
+        )
+
     summary = build_summary(
         packages,
         resolver,
         FirstSeen(first_seen_data),
         (first_seen_data or {}).get("indexHead"),
         fetch_palomar(),
+        formalizations,
+        stats,
     )
 
     problems = check_invariants(summary)
@@ -570,6 +954,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  palomar entries   : {stats['palomar_entries_matched']} on "
               f"{stats['packages_with_palomar']} packages, of "
               f"{stats['palomar_entries_in_feed']} in the feed")
+        print(f"  formalization.yaml: {stats['packages_with_formalization']} packages "
+              f"({stats['formalization_sorry_free']} declaring no sorry)")
+        # The scan counters say what the sweep actually did, which is the only way to
+        # tell "786 repositories have no file" from "786 requests never landed".
+        checked = ", ".join(
+            f"{key[len('formalization_'):].replace('_', ' ')} {stats[key]}"
+            for key in sorted(k for k in stats if k.startswith("formalization_"))
+            if stats[key] and key != "formalization_sorry_free"
+        )
+        if checked:
+            print(f"  formalization scan: {checked}")
         for key in sorted(k for k in stats if k.startswith("first_month_from_")):
             print(f"  firstMonth via {key[len('first_month_from_'):]:<20}: {stats[key]}")
     return 0

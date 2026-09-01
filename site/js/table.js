@@ -11,7 +11,7 @@
 
 import { CLS, color, cssv, num, tag, toolchainRelease } from "./dom.js";
 import { state } from "./state.js";
-import { growth, matchesQuery } from "./world.js";
+import { growth, hasFormalization, matchesQuery } from "./world.js";
 
 const COLS = [
   ["name", "Package", ""],
@@ -23,6 +23,10 @@ const COLS = [
   ["stars", "Stars", "num"],
   ["toolchain", "Toolchain", ""],
   ["lastCommit", "Last commit", ""],
+  /* The one column that is a claim rather than a measurement, which is why it is last and
+     why sorting it is the point: it is the only way to see all 22 packages declaring a
+     formalization.yaml without opening 808 panels. */
+  ["formalization", "formalization.yaml", ""],
 ];
 
 const MAX_ROWS = 900;
@@ -67,6 +71,11 @@ export function drawAllTable(host, keep, onOpen, onSort) {
     stars: n.p.stars,
     toolchain: toolchainRelease(n.p) || "—",
     lastCommit: n.p.lastCommit || "unknown",
+    // Sorts descending to "no sorry", then "declared", then the rest. Silence is not
+    // zero: only a declared 0 says "no sorry". See docs/DATA.md.
+    formalization: !hasFormalization(n.p)
+      ? "—"
+      : n.p.formalization.sorryCount === 0 ? "declared, no sorry" : "declared",
   }));
 
   // Search filters the table. The scope bar says so, because the same box only dims
@@ -113,6 +122,9 @@ export function drawAllTable(host, keep, onOpen, onSort) {
         sw.style.cssText = "display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:7px";
         sw.style.background = swatch[r.kk];
         td.append(sw, document.createTextNode(r.k));
+      } else if (k === "formalization") {
+        td.textContent = r.formalization;
+        if (r.formalization !== "—") td.style.color = good;
       } else if (k === "growth") {
         td.textContent = (r.growth > 0 ? "+" : "") + r.growth;
         if (r.growth > 0) td.style.color = good;

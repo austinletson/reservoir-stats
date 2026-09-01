@@ -81,7 +81,7 @@ export function drawComposition(host, c, total) {
         const path = el("path", { d, fill: color(cl.k) }, s);
         path.addEventListener("pointermove", (e) =>
           showTip(e.clientX, e.clientY, cl.label, [
-            { value: num(v) + " pkgs", name: pct(v, total) + "% of the ecosystem", color: color(cl.k) },
+            { value: num(v) + " pkgs", name: pct(v, total) + "% of packages in scope", color: color(cl.k) },
           ]));
         path.addEventListener("pointerleave", hideTip);
         const mid = (pa + pb) / 2;
@@ -130,7 +130,7 @@ export function drawComposition(host, c, total) {
       const hit = el("rect", { x, y: y - 10, width: Math.max(w, 6), height: BAR + 20, fill: "transparent" }, g);
       hit.addEventListener("pointermove", (e) =>
         showTip(e.clientX, e.clientY, o.cl.label, [
-          { value: num(o.v) + " pkgs", name: pct(o.v, tot) + "% of the ecosystem", color: color(o.cl.k) },
+          { value: num(o.v) + " pkgs", name: pct(o.v, tot) + "% of packages in scope", color: color(o.cl.k) },
         ]));
       hit.addEventListener("pointerleave", hideTip);
       x += o.w;

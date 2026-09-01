@@ -32,6 +32,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python3 -m pip install --quiet -r requirements.txt
 
       - name: Clone the Reservoir index with full history
         run: git clone --quiet https://github.com/leanprover/reservoir-index.git "$RUNNER_TEMP/reservoir-index"
@@ -42,8 +46,10 @@ jobs:
 
       # Prove the new file actually builds a valid summary before proposing it.
       - name: Verify it still produces a valid summary
+        # --no-formalization: this step is proving that the new first-seen.json still
+        # builds, and the GitHub sweep would spend 808 requests to say nothing about that.
         run: |
-          python3 reservoir_stats.py --refresh --out "$RUNNER_TEMP/summary.json" | tee verify.log
+          python3 reservoir_stats.py --refresh --no-formalization --out "$RUNNER_TEMP/summary.json" | tee verify.log
 
       - name: Open a pull request if anything changed
         env:

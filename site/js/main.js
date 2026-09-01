@@ -11,8 +11,8 @@ import { pushHash, readHash, setMonthCount, state, syncHash } from "./state.js";
 import { buildGraph, draw as drawGraph, initGraph, reheat, resizeCanvas, syncGraphControls } from "./graph.js";
 import { drawAllTable } from "./table.js";
 import {
-  BY_ID, counts, growth, init, MATHLIB, matchesQuery, meta, mixSeries, MONTHS, NM,
-  PALOMAR_N, PKGS, prevYear, rollup, scopedAt, world,
+  BY_ID, counts, FORMALIZATION_N, growth, init, matchesQuery, meta, mixSeries,
+  MONTHS, NM, PALOMAR_N, PKGS, prevYear, rollup, scopedAt, world,
 } from "./world.js";
 
 const $ = (id) => document.getElementById(id);
@@ -49,6 +49,12 @@ async function boot() {
   if (!PALOMAR_N) {
     state.palomarOnly = false;
     $("palomarFilter").classList.add("hidden");
+  }
+  // Same for formalization.yaml: 22 of 808 packages today, and none at all on a build
+  // whose GitHub sweep was skipped for want of a token.
+  if (!FORMALIZATION_N) {
+    state.formalizationOnly = false;
+    $("formalizationFilter").classList.add("hidden");
   }
   wireControls();
   initDrawer({ navigate: openPackage, close: closePackage });
@@ -159,10 +165,17 @@ function renderScopeBar(keep, w, total) {
       + " That feed is not the whole registry, so a package missing here may still be on"
       + " Palomar.");
   }
-  if (state.collapseMathlib) {
-    parts.push(state.view === "graph"
-      ? " Mathlib is excluded from the graph and the ranking."
-      : " Mathlib is excluded from the ranking.");
+  if (state.formalizationOnly) {
+    // Self-reported, and absence of the file is not absence of a formalization. Same
+    // shape of claim as the Palomar sentence above, and it has to be as explicit.
+    parts.push(` Limited to the ${num(FORMALIZATION_N)} packages with a formalization.yaml.`
+      + " Each file is the project's own claim about its own work, and most repositories"
+      + " carry no such file whatever they formalize.");
+  }
+  // Graph-only, because the graph is the only view it changes. Reads like the hide-orphans
+  // sentence above it, which is the other control that edits the drawing and nothing else.
+  if (state.view === "graph" && state.collapseMathlib) {
+    parts.push(" Mathlib and its edges are excluded from the graph.");
   }
   parts.push(" Dependency counts are always measured against the full graph, so filters change what you see, never what the numbers mean.");
   sb.append(strong, document.createTextNode(parts.join("")));
@@ -197,10 +210,13 @@ function renderKpis(keep, c, total, roll) {
 
 function renderRanking(keep, w) {
   const prevT = prevYear();
-  // Collapse Mathlib removes it from the ranking only — never from the counts, which is
-  // why this filters the display pool rather than the world.
-  const pool = [...keep.values()].filter((n) => !(state.collapseMathlib && n.p.id === MATHLIB));
-  const rows = pool.map((n) => ({
+  /* Nothing is filtered out of this pool, deliberately. Hide Mathlib used to remove it
+     here, on the theory that one package with 7x the dependents of the next flattens every
+     other bar. It does, and `drawTop` already fixes it by charting a runaway leader in its
+     own callout, so the only thing the filter achieved was deleting the callout that names
+     Mathlib and states its 478 dependents. That is information removed, not scale
+     regained. See docs/UI.md. */
+  const rows = [...keep.values()].map((n) => ({
     id: n.p.id,
     name: n.p.name,
     owner: n.p.owner,
@@ -309,8 +325,8 @@ function syncControls() {
   // Without aria-valuetext, assistive tech announces "25 of 33" instead of a date.
   $("asof").setAttribute("aria-valuetext", MONTHS[state.asof]);
   $("minstars").value = String(state.minStars);
-  $("collapseMathlib").setAttribute("aria-pressed", String(state.collapseMathlib));
   $("palomarOnly").setAttribute("aria-pressed", String(state.palomarOnly));
+  $("formalizationOnly").setAttribute("aria-pressed", String(state.formalizationOnly));
   syncGraphControls();
   $("find").value = state.query;
   document.querySelectorAll("#topMetric button").forEach((b) =>
@@ -337,6 +353,8 @@ function wireControls() {
     render();
   });
 
+  /* A graph control, wired here rather than in graph.js with the others, because it is the
+     only one that changes a scope-bar sentence and render() is what writes that. */
   $("collapseMathlib").addEventListener("click", (e) => {
     state.collapseMathlib = !state.collapseMathlib;
     e.currentTarget.setAttribute("aria-pressed", String(state.collapseMathlib));
@@ -346,6 +364,12 @@ function wireControls() {
   $("palomarOnly").addEventListener("click", (e) => {
     state.palomarOnly = !state.palomarOnly;
     e.currentTarget.setAttribute("aria-pressed", String(state.palomarOnly));
+    render();
+  });
+
+  $("formalizationOnly").addEventListener("click", (e) => {
+    state.formalizationOnly = !state.formalizationOnly;
+    e.currentTarget.setAttribute("aria-pressed", String(state.formalizationOnly));
     render();
   });
 

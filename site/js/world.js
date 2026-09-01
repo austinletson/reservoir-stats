@@ -42,6 +42,9 @@ export let MATHLIB = null;
    the fetch failed, or no recent registration names an indexed package — and main.js
    hides its filter chip rather than offer a control that can only empty the screen. */
 export let PALOMAR_N = 0;
+/* How many packages carry a formalization.yaml, for the same reason: 22 of 808 today, and
+   a build where the GitHub sweep was skipped has none at all. */
+export let FORMALIZATION_N = 0;
 
 export function init(data) {
   DATA = data;
@@ -53,6 +56,7 @@ export function init(data) {
   for (const p of PKGS) { p.nameLc = p.name.toLowerCase(); p.ownerLc = p.owner.toLowerCase(); }
   MATHLIB = data.mathlibId;
   PALOMAR_N = PKGS.reduce((n, p) => n + (hasPalomar(p) ? 1 : 0), 0);
+  FORMALIZATION_N = PKGS.reduce((n, p) => n + (hasFormalization(p) ? 1 : 0), 0);
   worldCache.clear();
   seriesKey = null;
   return DATA;
@@ -62,6 +66,10 @@ export const meta = () => DATA;
 /* Palomar entries are attached to a package only when the registry has some, so the
    field is absent far more often than it is empty. See docs/DATA.md. */
 export const hasPalomar = (p) => !!(p.palomar && p.palomar.length);
+
+/* Absent unless the repository has the file, so presence is the whole test. Says nothing
+   about whether the package formalizes anything — see docs/DATA.md. */
+export const hasFormalization = (p) => !!p.formalization;
 
 /* The dependencies a package declared as of month t.
  *
@@ -128,11 +136,12 @@ export function world(t) {
 }
 
 /* Display scope. Note what is NOT here: the search query, which is a finder rather than
-   a filter, and Collapse Mathlib, which applies only to the ranking. */
+   a filter, and Hide Mathlib, which edits the graph's drawing and nothing else. */
 export const inScope = (n) =>
   n.p.stars >= state.minStars
   && state.classes.has(n.k)
-  && (!state.palomarOnly || hasPalomar(n.p));
+  && (!state.palomarOnly || hasPalomar(n.p))
+  && (!state.formalizationOnly || hasFormalization(n.p));
 
 export function scopedAt(t) {
   const keep = new Map();
@@ -221,7 +230,8 @@ let seriesKey = null;
 let seriesAll = null;
 
 export function mixSeries() {
-  const key = `${state.minStars}|${[...state.classes].sort().join(",")}|${state.palomarOnly ? 1 : 0}`;
+  const key = `${state.minStars}|${[...state.classes].sort().join(",")}`
+    + `|${state.palomarOnly ? 1 : 0}|${state.formalizationOnly ? 1 : 0}`;
   if (key !== seriesKey) {
     seriesAll = [];
     for (let t = 0; t < NM; t++) {

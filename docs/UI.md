@@ -77,6 +77,77 @@ state this out loud, and if the scope bar and the screen ever disagree that is a
 Verified by measurement, not inspection: at min-stars 100+, `mathlib` still reports 478
 dependents and `aesop` still reports 26.
 
+### The control bar is split on that same line
+
+Two labelled rows, and the split is not decoration:
+
+| Row | Contains | What it does |
+|---|---|---|
+| **Scope** | As of, Min stars, the four class chips, On Palomar, Has formalization.yaml | goes through `inScope`; changes which packages are counted |
+| **Find** | Jump to a package | narrows the All packages table; dims or highlights elsewhere |
+
+Everything used to sit in one wrapping row as identical pills, Hide Mathlib among them.
+That read as "drop Mathlib from the data", which is the opposite of what it does. It has
+since moved out of this bar entirely; see below.
+
+### Three weights, in reading order
+
+The tab strip, the control panel and the content cards were all the same object: filled
+with `--surface`, one-pixel bordered, rounded. Stacked, that gave the top of the page three
+interchangeable-looking panels and no hierarchy, and the tab strip in particular got the
+same treatment as `.seg`, the segmented control inside the graph — so page navigation looked
+like a toggle sitting among controls.
+
+| Band | Chrome | Why |
+|---|---|---|
+| Tabs | none; text with a 2px underline on the selected one | navigation, drawn as navigation |
+| Filter panel | outline only, filled with `--plane` (the page colour) | controls, recessed rather than raised |
+| Content | filled `--surface` card | the only thing on the page that is data |
+
+The underline overlaps the strip's own hairline (`margin-bottom: -1px`) so the indicator sits
+*on* the rule rather than below it. The global `:focus-visible` ring still lands on the tabs,
+checked with real Tab keypresses rather than `.focus()`, which does not set keyboard modality
+in Chrome.
+
+### A control belongs to the view it changes
+
+Hide Mathlib (called Collapse Mathlib until it was measured) sat in the page's control bar
+for three views and earned its place in one:
+
+| View | What pressing it did |
+|---|---|
+| Graph | removed Mathlib and its 47% of all edges, and in focus mode re-centred on the next real hub |
+| Overview | deleted the ranking callout naming Mathlib, and revealed rank 13 |
+| All packages | nothing at all, while the scope bar asserted "Mathlib is excluded from the ranking" with `mathlib` sitting in row 1 |
+
+The Overview case is the interesting one. Its stated purpose is scale: one package with 7x
+the dependents of the next flattens every other bar. True, and `drawTop` already fixes it
+by charting a runaway leader in its own callout (`rows[0] >= rows[1] * 2.5`; Mathlib is 478
+against 78). **The bars never contained Mathlib either way**, so the filter could not
+improve the scale. Measured: callout `mathlib 478 dependents · 59% of every package` and 12
+bars with it off, no callout and 13 bars with it on. Information removed, not scale
+regained.
+
+So it now lives in the graph's own controls, beside the mode switch, and outside
+`#allOnlyTools` because hiding Mathlib matters in both graph modes where hide-orphans only
+matters in one. `renderRanking` filters nothing. The scope-bar sentence is graph-only and
+reads like the hide-orphans one next to it. The `m=1` hash key is kept through the rename so
+existing deep links resolve; on Overview or All packages it now correctly claims nothing.
+
+### "Share of the ecosystem" was a share of the scope
+
+`charts.js` computed `pct(v, total)` where `total` is the **scoped** count, then labelled it
+"of the ecosystem", in the composition bar tooltip, the donut tooltip, and the mix-over-time
+caption. Under the formalization.yaml filter that printed `1 pkgs · 50% of the ecosystem`
+for a package that is 0.1% of the ecosystem. All three now say "of packages in scope",
+which is what the number is in every case, filtered or not. Same family as the 1811%
+callout below: a denominator that quietly changed identity under a filter.
+
+Two layout details worth keeping: each row is a grid with the label in its own column, so a
+Scope row that wraps indents its second line under the controls rather than sliding back
+under the label; and a `.vr` separator that has wrapped to the start of a line is hidden,
+because it would be a rule against nothing.
+
 ## Things that look like they could be simplified but cannot
 
 - **Ranking bars are all one neutral ink.** They were coloured by class once and it was
@@ -107,6 +178,19 @@ dependents and `aesop` still reports 26.
 - **The Palomar chip goes through `inScope`, not through the render.** It is a scope
   filter like min stars, so the same rule holds: with it on, `mathlib` still reports 478
   dependents. What it must never become is a filter applied before counting.
+- **"Has formalization.yaml" is the same kind of chip, with the same two guards.** It goes
+  through `inScope`, and it is hidden with its state cleared on a build where no package
+  carries the file — which includes any build whose GitHub sweep was skipped for want of a
+  token, not just an empty ecosystem.
+- **A new scope filter has to join `mixSeries`'s memo key.** That series is memoised on the
+  filter tuple, not on `asof`, because it is a prefix. Adding `formalizationOnly` to
+  `inScope` and not to the key leaves the mix-over-time chart showing the *previous* scope
+  until some other filter moves: Nov 23 kept reading 96 packages when the filtered answer
+  is 0. Any future filter has the same trap.
+- **The file is named, never paraphrased.** The chip, the badge, the panel heading and the
+  table column all read `formalization.yaml`, because the reader's next move is to go and
+  open that file in the repository. "Declared formalization" described the same thing while
+  hiding the one string they can act on.
 - **No `localStorage`.** In-memory state plus the URL hash, so the page stays embeddable
   and a view stays shareable.
 
@@ -128,7 +212,7 @@ Beyond the stack, four:
 
 ## Palomar, and saying what the data cannot
 
-The one thing on the page that does not come from the Reservoir index: entries in the
+The two things on the page that do not come from the Reservoir index: entries in the
 [Palomar](https://palomar-registry.org) registry of Lean-verified results, joined to the
 package whose repository they cite. A filter chip scopes the app to those packages, and
 the detail panel lists their entries with a badge above.
@@ -142,6 +226,65 @@ the same reason the scope bar exists at all. See `docs/DATA.md`.
 The panel puts the section above the adoption chart. It is the strongest claim on the
 panel — what this repository *proves* — and below the charts it would sit under thirty
 dependent pills.
+
+### formalization.yaml, which is a claim rather than a record
+
+Directly below Palomar, the panel shows what the repository's own `formalization.yaml`
+declares, with a link to the file itself — every claim in the section is checkable only
+against it, and `/blob/HEAD/` lets GitHub resolve the default branch we do not store.
+22 of 808 packages have the file.
+
+Everything the file supplies, and nowhere else on the panel:
+
+| Row | From |
+|---|---|
+| the paragraph under the caption | `project.description`, shown only when it differs from the index's own description |
+| Declared name | `project.name`, shown only when it differs from the package name |
+| Sorry | `status.sorry_count`, with `sorry_in_definitions` appended |
+| Axioms | `status.axioms` |
+| Repository role | `repository.role` |
+| Produced by | `automation.methods[].method`, deduplicated |
+| Review | `review.status` |
+| Declared license | `project.license`, which is the file's claim and not what GitHub reports |
+| Authors | `project.authors`, first six then a count |
+| Classified | `classification.arxiv` and `classification.msc2020`, merged |
+| Scope | `status.scope` |
+| Main results | `status.main_results[]`: declaration, file, per-result sorry count |
+| Sources | `sources[]`: title, type, relationship, and the id as a link when it is an arXiv URL or a DOI |
+
+The badge above the fact list is `status.sorry_count` again, because it is the one thing a
+reader scanning the panel wants first.
+
+Finding them does not require opening 808 panels: the **"Has formalization.yaml"** chip
+scopes the whole app to those packages, and the **All packages** table's last column sorts
+them together. The column separates "declared, no sorry" from a bare "declared" for the
+same reason the badge does.
+
+It sits next to Palomar because the two answer the same question from opposite ends, and
+that is exactly why it does not look like the sections around it. Every other section on
+the panel is measured from the Reservoir index; every word in this one is copied out of a
+file in the package's own repository. So it is fenced in its own box, with a left rule, a
+`self-reported` tag on the heading, and a caption that reads "Read as a claim, not a
+check". Styling it like the measured data would invite a reader to trust the two equally.
+
+**It collapses.** A `<details>`, so keyboard support is native and there is no toggle state
+to re-apply; PFR's entry is 2,000px of prose and a reader who does not want it should be
+able to fold it away. Open by default, because fetching the file and then hiding it would
+be pointless. Whether it is open is remembered in a module variable for the session: the
+drawer body is rebuilt on every render, so without that, collapsing the box and then
+nudging the month slider would silently re-expand it. Not in the URL — it is a reading
+preference, not scope.
+
+Two absences are never allowed to read as answers:
+
+- **No file is not "not formalized."** 786 repositories have none, which says nothing about
+  what they prove.
+- **No declared `sorry_count` is not zero.** A file that states one earns the green "no
+  sorry" badge; a file that says nothing gets the plain "formalization.yaml".
+
+Every field is optional in practice, whatever the schema requires, so anything the file
+does not set is simply not drawn. A `v0.3` file with four keys renders as four rows rather
+than as a table full of "unknown".
 
 ## The detail panel docks rather than overlays
 
@@ -161,6 +304,33 @@ Two things follow that are easy to get wrong:
 - Focus moves to the panel heading only on the *first* open. Doing it on every package
   would yank focus off the graph canvas mid-navigation, which is the thing docking exists
   to prevent.
+
+### Widen, for reading one package instead of comparing it
+
+A **Widen** button beside Close takes the docked panel from 440px to
+`min(980px, 62vw)` — enough for the whole of a `formalization.yaml` entry without
+scrolling past it in a 440px column. **Narrow** puts it back.
+
+Four details, each of which is the reason it is a class on `<body>` rather than a width on
+the panel:
+
+- The width is a CSS variable that both the panel and the body's `padding-right` read, so
+  one class moves both and the page is *reflowed* rather than covered. Widening never turns
+  the docked panel into an overlay.
+- It re-measures the canvas, twice, for the same reason opening the panel does: the
+  container is still mid-transition on the first call. Widening while the graph is open
+  visibly shrinks the graph and the graph keeps working.
+- The override is scoped inside the `min-width: 1000px` block. Below the breakpoint the
+  panel is already a 94vw overlay, so there is nothing to widen into; the button is hidden
+  there rather than left to do nothing.
+- At 980px a paragraph would run to about 140 characters, so prose and the fact grid are
+  held to `78ch`. The extra width is for the pill lists and the declaration boxes, which
+  use all of it.
+
+The label says what the button will do next rather than carrying `aria-pressed` with a
+fixed label: "Widen"/"Narrow" needs no second channel to be understood. Like the
+`formalization.yaml` box's open state, it lives in a module variable and not in the URL —
+it is how one reader wants to read, not something a shared link should impose.
 
 ## The graph
 
@@ -206,7 +376,19 @@ The load-bearing ones, all of which have been run against this build:
 | Min stars 100+ | `mathlib` 478 and `aesop` 26, unchanged |
 | Palomar chip on | same 478 and 26; scope bar states the feed is not the registry |
 | Palomar chip on a build with no entries | chip hidden, `#pl=1` ignored, dashboard unchanged |
+| "Has formalization.yaml" chip on | 22 of 808 in scope, `mathlib` still 478 elsewhere, `#fz=1` in the hash |
+| The same chip, mix-over-time chart | Nov 23 recomputes to 0 rather than staying at 96 |
+| The same chip on a build with no files | chip hidden, `#fz=1` ignored, dashboard unchanged |
+| Panel for a package with `formalization.yaml` | section present, declarations named, "no sorry" only when declared `0` |
+| Panel for a package without one | no section, no badge, no empty heading |
+| Panel for a `v0.3` file with four keys | only those four rows, nothing rendered as "unknown" |
+| Collapsing the box, then moving the slider | stays collapsed, and stays collapsed for the next package opened |
+| Widen with the graph open | panel 440px → 930px at 1500px wide, canvas re-measures 995px → 505px, graph still live |
+| Widen below 1000px | button hidden, panel stays a 440px overlay |
 | Ranking callout share with filters on | ≤100% (it printed 1811% once) |
+| Every control after the Scope/Find split | class chip 808→626, min stars 100+ →62, slider back 6 months →59 of 596, both attribute chips still write their hash keys |
+| Hide Mathlib, per view | visible and effective only on Graph; hidden on Overview and All packages, where `#m=1` changes nothing and claims nothing |
+| Composition tooltips under a filter | "% of packages in scope", never "of the ecosystem" |
 | Slider back 12 months | composition, mix and both line charts all end at the same month |
 | Tabbable count, drawer closed | ~24, none of them inside the drawer |
 | Tabbable count, panel open, below 1000px | zero outside the panel, `inert` and `aria-modal` set |
