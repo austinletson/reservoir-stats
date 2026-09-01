@@ -46,10 +46,26 @@ button, select, input { font: inherit; color: inherit }
 
 /* One filter row, above everything, scoping every view below it. Never a filter
    inside a card — see 05-INTERACTION-SPEC.md § Scope. */
+/* Two rows, split on `inScope`: Scope changes which packages are counted, View does not.
+   The split is the point — every control here used to be the same pill in the same row, so
+   Collapse Mathlib read as a filter when it removes nothing from any count. */
 .filters {
-  display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 0 8px;
+  display: flex; flex-direction: column; gap: 9px; margin: 14px 0 8px;
   padding: 11px 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
 }
+/* Grid rather than one wrapping flex row: the label is its own column, so a Scope row that
+   wraps indents its second line under the controls instead of sliding back under the
+   label. */
+.frow { display: grid; grid-template-columns: 42px 1fr; gap: 10px; align-items: start }
+.fctl { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; row-gap: 8px }
+/* A hairline between the rows, so they read as two groups rather than as one that wrapped. */
+.frow + .frow { border-top: 1px solid var(--border); padding-top: 9px }
+.flab {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted);
+  font-weight: 600; padding-top: 8px;   /* onto the baseline of the first control row */
+}
+/* A separator that has wrapped to the start of a line is a rule against nothing. */
+.fctl .vr:first-child { display: none }
 .filters label { color: var(--ink2); font-size: 12.5px; margin-right: 2px }
 .filters select,
 .filters input[type=search] { background: transparent; border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px }

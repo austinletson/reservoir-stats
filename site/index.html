@@ -29,41 +29,55 @@
       <button role="tab" id="tab-table" aria-selected="false" aria-controls="view-table">All packages</button>
     </div>
 
-    <!-- One filter row for the whole app. It scopes every view below it. -->
+    <!-- The app's controls, split on the one boundary that matters: the Scope row is
+         everything that goes through `inScope` and changes which packages are counted, the
+         View row is everything that does not. Collapse Mathlib sat among the scope chips
+         for a while, styled identically, which read as "drop Mathlib from the data" when
+         it does nothing of the kind. See docs/UI.md. -->
     <div class="filters">
-      <label for="asof">As of</label>
-      <input type="range" id="asof" min="0" step="1" aria-describedby="asofLab">
-      <span id="asofLab" style="font-variant-numeric:tabular-nums;font-weight:600;min-width:56px"></span>
-      <span class="vr"></span>
-      <label for="minstars">Min stars</label>
-      <select id="minstars">
-        <option value="0">any</option><option value="5">5+</option>
-        <option value="25">25+</option><option value="100">100+</option>
-      </select>
-      <span class="vr"></span>
-      <div class="chips" id="clschips"></div>
-      <span class="vr"></span>
-      <button class="chip gchip" id="collapseMathlib" aria-pressed="false" type="button"
-        title="Drop Mathlib from the ranking and the graph so everything else gets the full scale. It has roughly 7x the dependents of the next package. Counts are not affected.">Collapse Mathlib</button>
-      <!-- Hidden by main.js when no package in the data carries a Palomar entry, rather
-           than left as a control whose only effect is to empty the screen. -->
-      <span id="palomarFilter" style="display:flex;gap:10px;align-items:center">
+      <div class="frow" role="group" aria-label="Scope — which packages are counted">
+        <span class="flab" aria-hidden="true">Scope</span>
+        <div class="fctl">
+        <label for="asof">As of</label>
+        <input type="range" id="asof" min="0" step="1" aria-describedby="asofLab">
+        <span id="asofLab" style="font-variant-numeric:tabular-nums;font-weight:600;min-width:56px"></span>
         <span class="vr"></span>
-        <button class="chip gchip" id="palomarOnly" aria-pressed="false" type="button"
-          title="Keep only packages whose repository has an entry in the Palomar registry of Lean-verified results. Palomar publishes a feed of recent registrations, not the whole registry, so this is a lower bound.">On Palomar</button>
-      </span>
-      <!-- Hidden by main.js on a build where no package carries the file, for the same
-           reason as the Palomar chip: a control whose only effect is to empty the page. -->
-      <span id="formalizationFilter" style="display:flex;gap:10px;align-items:center">
+        <label for="minstars">Min stars</label>
+        <select id="minstars">
+          <option value="0">any</option><option value="5">5+</option>
+          <option value="25">25+</option><option value="100">100+</option>
+        </select>
         <span class="vr"></span>
-        <button class="chip gchip" id="formalizationOnly" aria-pressed="false" type="button"
-          title="Keep only packages whose repository has a formalization.yaml. Self-reported by each project, and only a fraction of repositories carry the file at all, so this finds the packages with the file rather than the packages that formalize something.">Has formalization.yaml</button>
-      </span>
-      <span class="vr"></span>
-      <span style="position:relative">
-        <input type="search" id="find" placeholder="Jump to a package…" aria-label="Jump to a package"
-          autocomplete="off" role="combobox" aria-expanded="false" aria-controls="findList" aria-autocomplete="list">
-      </span>
+        <div class="chips" id="clschips"></div>
+        <!-- Hidden by main.js when no package in the data carries a Palomar entry, rather
+             than left as a control whose only effect is to empty the screen. -->
+        <span id="palomarFilter" style="display:flex;gap:10px;align-items:center">
+          <span class="vr"></span>
+          <button class="chip gchip" id="palomarOnly" aria-pressed="false" type="button"
+            title="Keep only packages whose repository has an entry in the Palomar registry of Lean-verified results. Palomar publishes a feed of recent registrations, not the whole registry, so this is a lower bound.">On Palomar</button>
+        </span>
+        <!-- Hidden by main.js on a build where no package carries the file, for the same
+             reason as the Palomar chip: a control whose only effect is to empty the page. -->
+        <span id="formalizationFilter" style="display:flex;gap:10px;align-items:center">
+          <span class="vr"></span>
+          <button class="chip gchip" id="formalizationOnly" aria-pressed="false" type="button"
+            title="Keep only packages whose repository has a formalization.yaml. Self-reported by each project, and only a fraction of repositories carry the file at all, so this finds the packages with the file rather than the packages that formalize something.">Has formalization.yaml</button>
+        </span>
+        </div>
+      </div>
+
+      <div class="frow" role="group" aria-label="View — what is drawn, without changing the counts">
+        <span class="flab" aria-hidden="true">View</span>
+        <div class="fctl">
+        <button class="chip gchip" id="collapseMathlib" aria-pressed="false" type="button"
+          title="Drop Mathlib from the ranking and the graph so everything else gets the full scale. It has roughly 7x the dependents of the next package. Counts are not affected.">Collapse Mathlib</button>
+        <span class="vr"></span>
+        <span style="position:relative">
+          <input type="search" id="find" placeholder="Jump to a package…" aria-label="Jump to a package"
+            autocomplete="off" role="combobox" aria-expanded="false" aria-controls="findList" aria-autocomplete="list">
+        </span>
+        </div>
+      </div>
     </div>
     <p class="scopebar" id="scopebar"></p>
 

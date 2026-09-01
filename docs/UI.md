@@ -77,6 +77,29 @@ state this out loud, and if the scope bar and the screen ever disagree that is a
 Verified by measurement, not inspection: at min-stars 100+, `mathlib` still reports 478
 dependents and `aesop` still reports 26.
 
+### The control bar is split on that same line
+
+Two labelled rows, and the split is not decoration:
+
+| Row | Contains | What it does |
+|---|---|---|
+| **Scope** | As of, Min stars, the four class chips, On Palomar, Has formalization.yaml | goes through `inScope`; changes which packages are counted |
+| **View** | Collapse Mathlib, Jump to a package | changes what is drawn; the counted set is untouched |
+
+Everything used to sit in one wrapping row as identical pills, with Collapse Mathlib
+between the class chips and On Palomar. That read as "drop Mathlib from the data", which is
+the opposite of what it does: it removes Mathlib from the ranking and the graph and leaves
+every count alone. Two controls that differ that fundamentally must not look the same.
+
+The search box is on the View row because it is a finder rather than a filter — it narrows
+the All packages table and only dims or highlights elsewhere, which the scope bar says when
+a query is active.
+
+Two layout details worth keeping: each row is a grid with the label in its own column, so a
+Scope row that wraps indents its second line under the controls rather than sliding back
+under the label; and a `.vr` separator that has wrapped to the start of a line is hidden,
+because it would be a rule against nothing.
+
 ## Things that look like they could be simplified but cannot
 
 - **Ranking bars are all one neutral ink.** They were coloured by class once and it was
@@ -315,6 +338,7 @@ The load-bearing ones, all of which have been run against this build:
 | Widen with the graph open | panel 440px → 930px at 1500px wide, canvas re-measures 995px → 505px, graph still live |
 | Widen below 1000px | button hidden, panel stays a 440px overlay |
 | Ranking callout share with filters on | ≤100% (it printed 1811% once) |
+| Every control after the Scope/View split | class chip 808→626, min stars 100+ →62, slider back 6 months →59 of 596, Collapse Mathlib and the two attribute chips all still write their hash keys |
 | Slider back 12 months | composition, mix and both line charts all end at the same month |
 | Tabbable count, drawer closed | ~24, none of them inside the drawer |
 | Tabbable count, panel open, below 1000px | zero outside the panel, `inert` and `aria-modal` set |
