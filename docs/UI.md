@@ -90,6 +90,25 @@ Everything used to sit in one wrapping row as identical pills, Hide Mathlib amon
 That read as "drop Mathlib from the data", which is the opposite of what it does. It has
 since moved out of this bar entirely; see below.
 
+### Three weights, in reading order
+
+The tab strip, the control panel and the content cards were all the same object: filled
+with `--surface`, one-pixel bordered, rounded. Stacked, that gave the top of the page three
+interchangeable-looking panels and no hierarchy, and the tab strip in particular got the
+same treatment as `.seg`, the segmented control inside the graph — so page navigation looked
+like a toggle sitting among controls.
+
+| Band | Chrome | Why |
+|---|---|---|
+| Tabs | none; text with a 2px underline on the selected one | navigation, drawn as navigation |
+| Filter panel | outline only, filled with `--plane` (the page colour) | controls, recessed rather than raised |
+| Content | filled `--surface` card | the only thing on the page that is data |
+
+The underline overlaps the strip's own hairline (`margin-bottom: -1px`) so the indicator sits
+*on* the rule rather than below it. The global `:focus-visible` ring still lands on the tabs,
+checked with real Tab keypresses rather than `.focus()`, which does not set keyboard modality
+in Chrome.
+
 ### A control belongs to the view it changes
 
 Hide Mathlib (called Collapse Mathlib until it was measured) sat in the page's control bar

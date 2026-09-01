@@ -34,15 +34,28 @@ button, select, input { font: inherit; color: inherit }
 .btn { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 11px; cursor: pointer }
 .btn:hover { background: var(--ghost) }
 
+/* Navigation, drawn as navigation.
+ *
+ * This was a filled, bordered, rounded pill container — the same treatment as `.seg` (the
+ * graph's mode switch) and as `.filters` and `.card` below it. So the top of the page was
+ * three interchangeable-looking panels in a row with no hierarchy between them, and the
+ * one that was actually page navigation looked like a toggle sitting among controls.
+ *
+ * Underlined text tabs on the page background instead. They read as nav, they no longer
+ * echo the segmented control inside the graph, and they leave `.filters` as the only
+ * panel in the region, which is the delineation. */
 .tabs {
-  display: flex; gap: 2px; margin: 16px 0 0; padding: 3px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  display: flex; gap: 2px; margin: 18px 0 0;
+  border-bottom: 1px solid var(--border);
 }
 .tabs button {
-  border: 0; background: transparent; border-radius: 7px; padding: 7px 15px;
-  cursor: pointer; color: var(--ink2); font-weight: 500;
+  border: 0; background: transparent; cursor: pointer; color: var(--muted);
+  padding: 9px 14px 8px; font-size: 14.5px; font-weight: 550;
+  /* The indicator overlaps the strip's own rule rather than sitting under it. */
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
 }
-.tabs button[aria-selected="true"] { background: var(--ghost); color: var(--ink); font-weight: 600 }
+.tabs button:hover { color: var(--ink2) }
+.tabs button[aria-selected="true"] { color: var(--ink); font-weight: 620; border-bottom-color: var(--c-mathlib) }
 
 /* One filter row, above everything, scoping every view below it. Never a filter
    inside a card — see 05-INTERACTION-SPEC.md § Scope. */
@@ -52,7 +65,12 @@ button, select, input { font: inherit; color: inherit }
    to the graph, the only view it changes. */
 .filters {
   display: flex; flex-direction: column; gap: 9px; margin: 14px 0 8px;
-  padding: 11px 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 11px 13px; border: 1px solid var(--border); border-radius: 12px;
+  /* Outlined on the page rather than filled like a `.card`. Three weights in the region
+     now, in reading order: nav has no chrome, the control panel is an outline, content is
+     a filled card. Filling this the same as the cards below made the controls look like
+     the first piece of content. */
+  background: var(--plane);
 }
 /* Grid rather than one wrapping flex row: the label is its own column, so a Scope row that
    wraps indents its second line under the controls instead of sliding back under the
