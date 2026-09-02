@@ -81,7 +81,6 @@ function renderFooter() {
   const stamp = isNaN(when) ? d.generatedAt : when.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   $("footGen").textContent =
     `${num(PKGS.length)} packages, ${MONTHS[0]} to ${MONTHS[NM - 1]}. Data generated ${stamp} from the Reservoir index.`;
-  $("footNow").textContent = num(PKGS.length);
 }
 
 /* ================= render ================= */
