@@ -97,14 +97,14 @@ export function renderDrawer(id) {
   meta.appendChild(b2);
 
   if (p.toolchainCurrent) {
-    meta.appendChild(tag("span", "badge", "On the newest toolchain"));
+    meta.appendChild(tag("span", "badge", "Latest toolchain"));
   } else if (release) {
-    const b3 = tag("span", "badge", "Behind the newest toolchain");
+    const b3 = tag("span", "badge", "Older toolchain");
     b3.style.color = cssv("--muted");
     meta.appendChild(b3);
   }
   if (p.stale) {
-    const b4 = tag("span", "badge", "No commits in 12 months");
+    const b4 = tag("span", "badge", "Inactive 12+ months");
     b4.style.color = cssv("--crit");
     meta.appendChild(b4);
   }
@@ -157,8 +157,7 @@ export function renderDrawer(id) {
   if (palomar.length) {
     const palHost = section(
       "On Palomar",
-      "Lean-verified results registered against this repository, newest first. Palomar's "
-      + "feed carries recent registrations only, so this may not be all of them.",
+      "Recent Lean-verified results. This feed may be incomplete.",
     );
     palomar.forEach((e) => palHost.appendChild(palomarEntry(e)));
   }
@@ -177,7 +176,7 @@ export function renderDrawer(id) {
   const gained = adopt[T] - (T >= 12 ? adopt[T - 12] : 0);
   if (T > 0) {
     lineChart(
-      section("Adoption", `Packages depending on it, cumulative. ${gained >= 0 ? "+" : ""}${gained} in the last 12 months.`),
+      section("Adoption", `Cumulative dependents · ${gained >= 0 ? "+" : ""}${gained} in 12 months`),
       { values: adopt, months: MONTHS.slice(0, T + 1), W: 400, H: 180, name: "dependents", colorKey: "--neutral" },
     );
   }
@@ -187,7 +186,7 @@ export function renderDrawer(id) {
   const deps = n ? n.deps : [];
   const depHost = section("Requires", plural(deps.length, "package"));
   if (deps.length) deps.forEach((d) => depHost.appendChild(pillFor(d)));
-  else depHost.appendChild(muted("Nothing — this package is standalone."));
+  else depHost.appendChild(muted("Standalone."));
 
   const dependents = dependentsOf(id, T);
   const dtHost = section("Depended on by",
@@ -196,7 +195,7 @@ export function renderDrawer(id) {
     dependents.slice(0, MAX_PILLS).forEach((d) => dtHost.appendChild(pillFor(d)));
     if (dependents.length > MAX_PILLS) dtHost.appendChild(muted(`+${dependents.length - MAX_PILLS} more`));
   } else {
-    dtHost.appendChild(muted("Nothing depends on it yet."));
+    dtHost.appendChild(muted("No dependents yet."));
   }
 
   return true;
@@ -255,8 +254,8 @@ function formalizationSection(f, p) {
   box.appendChild(sum);
 
   const cap = tag("p", "cap",
-    "Copied from the file in the package's own repository"
-    + (f.version ? `, to schema ${f.version}` : "") + ". Read as a claim, not a check.");
+    "Self-reported by this repository"
+    + (f.version ? ` · schema ${f.version}` : "") + ".");
   cap.style.cssText = "color:var(--muted);margin:0 0 6px";
   box.appendChild(cap);
 

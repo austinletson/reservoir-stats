@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reservoir Stats — the Lean 4 package ecosystem</title>
-<meta name="description" content="Dependency statistics for every package on Reservoir, the Lean 4 package registry: what the ecosystem is built on, how it is composed, and how it is growing.">
+<title>Reservoir Stats — Lean 4 package dependencies</title>
+<meta name="description" content="Dependency statistics for Lean 4 packages indexed by Reservoir.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 16 L27 8 M16 16 L26 25' stroke='%23898781' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='8' fill='%232a78d6'/%3E%3Ccircle cx='27' cy='8' r='4' fill='%23eb6834'/%3E%3Ccircle cx='26' cy='25' r='3.5' fill='%231baf7a'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/tokens.css">
 <link rel="stylesheet" href="css/app.css">
@@ -13,8 +13,7 @@
 <div class="wrap">
   <header class="top">
     <h1>Reservoir Stats</h1>
-    <span class="sub">Dependency statistics for the
-      <a href="https://lean-lang.org">Lean&nbsp;4</a> package ecosystem, as indexed by
+    <span class="sub"><a href="https://lean-lang.org">Lean&nbsp;4</a> package dependencies from
       <a href="https://reservoir.lean-lang.org">Reservoir</a></span>
     <span class="spacer"></span>
     <button class="btn" id="themeBtn" type="button">Dark</button>
@@ -55,14 +54,14 @@
         <span id="palomarFilter" style="display:flex;gap:10px;align-items:center">
           <span class="vr"></span>
           <button class="chip gchip" id="palomarOnly" aria-pressed="false" type="button"
-            title="Keep only packages whose repository has an entry in the Palomar registry of Lean-verified results. Palomar publishes a feed of recent registrations, not the whole registry, so this is a lower bound.">On Palomar</button>
+            title="Show packages in Palomar's recent-registration feed. A missing package may still be on Palomar.">On Palomar</button>
         </span>
         <!-- Hidden by main.js on a build where no package carries the file, for the same
              reason as the Palomar chip: a control whose only effect is to empty the page. -->
         <span id="formalizationFilter" style="display:flex;gap:10px;align-items:center">
           <span class="vr"></span>
           <button class="chip gchip" id="formalizationOnly" aria-pressed="false" type="button"
-            title="Keep only packages whose repository has a formalization.yaml. Self-reported by each project, and only a fraction of repositories carry the file at all, so this finds the packages with the file rather than the packages that formalize something.">Has formalization.yaml</button>
+            title="Show packages with a self-reported formalization.yaml file.">Has formalization.yaml</button>
         </span>
         </div>
       </div>
@@ -93,7 +92,7 @@
           <div class="cardhead">
             <div>
               <h3>What packages require</h3>
-              <p class="cap">Every package falls in exactly one class, by what it lists in <code>require</code>.</p>
+              <p class="cap">One class per package, based on its <code>require</code> entries.</p>
             </div>
             <div class="spacer"></div>
             <div class="seg" id="compForm" role="group" aria-label="Composition chart form">
@@ -111,7 +110,7 @@
           <div class="cardhead">
             <div>
               <h3>Mix over time</h3>
-              <p class="cap">Share of the packages in scope in each class, month by month, up to the selected date.</p>
+              <p class="cap">Package share by class and month.</p>
             </div>
             <div class="spacer"></div>
             <div class="seg" id="mixForm" role="group" aria-label="Mix chart form">
@@ -147,12 +146,12 @@
       <div class="grid g-11" style="margin-top:14px">
         <div class="card">
           <div class="cardhead"><div><h3>Ecosystem size</h3>
-            <p class="cap">Packages in scope, cumulative. The registry opened with 213 packages at once — see the note below.</p></div></div>
+            <p class="cap">Packages in scope over time. Reservoir launched with 213 packages.</p></div></div>
           <div id="ecoN"></div>
         </div>
         <div class="card">
           <div class="cardhead"><div><h3>Dependency edges</h3>
-            <p class="cap">Total <code>require</code> edges. A separate chart, not a second axis.</p></div></div>
+            <p class="cap">Total <code>require</code> edges over time.</p></div></div>
           <div id="ecoE"></div>
         </div>
       </div>
@@ -166,9 +165,9 @@
         <div class="gtools">
           <div class="seg" id="graphMode" role="group" aria-label="Graph mode">
             <button data-g="focus" aria-pressed="true"
-              title="One package at a time: what depends on it above, what it requires below, arrows pointing at what is required.">One package</button>
+              title="Explore one package and its direct connections.">One package</button>
             <button data-g="all" aria-pressed="false"
-              title="Every package at once. Shows that the ecosystem is a star around Mathlib, but most nodes carry no size information.">Everything</button>
+              title="Show the full dependency graph.">Everything</button>
           </div>
           <!-- Lives here rather than in the page's control bar because the graph is the only
                view it changes. It used to also drop Mathlib from the Overview ranking, which
@@ -177,10 +176,10 @@
                Outside #allOnlyTools on purpose: that group is hidden in focus mode, and
                hiding Mathlib matters in both graph modes. -->
           <button class="chip gchip" id="collapseMathlib" aria-pressed="false" type="button"
-            title="Remove Mathlib and its edges from the graph. It owns 47% of every edge and 71% of drawn nodes sit in its direct star, so the rest of the structure is hard to see with it in. Counts are not affected.">Hide Mathlib</button>
+            title="Remove Mathlib and its edges from this graph. Counts stay the same.">Hide Mathlib</button>
           <span id="allOnlyTools" style="display:flex;gap:8px;align-items:center">
             <button class="chip gchip" id="hideOrphans" aria-pressed="true" type="button"
-              title="Packages with no edges in the current view form a meaningless ring of confetti around the graph. Hidden by default.">Hide packages with no edges</button>
+              title="Hide packages with no visible connections.">Hide packages with no edges</button>
             <button class="btn" id="relayout" type="button" style="padding:4px 10px;font-size:12.5px">Re-layout</button>
           </span>
           <span id="focusHint" style="color:var(--muted);font-size:12px">Click any package to centre it</span>
@@ -188,21 +187,11 @@
         <div class="glegend" id="graphLegend"></div>
         <div class="gnote" id="graphNote"></div>
       </div>
-      <div id="graphNarrow" class="card"><h3>The graph needs a wider screen</h3>
-        <p class="cap">A force layout of this many nodes is unreadable below about 700px.
-          Use <b>All packages</b> for the same data as a sortable table.</p></div>
+      <div id="graphNarrow" class="card"><h3>The graph needs more space</h3>
+        <p class="cap">Use a screen at least 700px wide, or switch to <b>All packages</b>.</p></div>
       <p class="cap" style="color:var(--muted);margin-top:10px">
-        Node area is proportional to how many packages depend on it; fill says what the package itself
-        requires (hollow = requires nothing). Arrows point at what is required, so lower is more
-        foundational. Dashed marks are groups of packages collapsed into one; click to open them.
-        Click any package to centre the view on it. Drag to pan, scroll to zoom.
-      </p>
-      <p class="cap" style="color:var(--muted);margin-top:6px">
-        <b>Why one package at a time is the default.</b> 82% of packages have nothing depending on them,
-        the median package has none, and Mathlib alone accounts for 47% of every dependency edge. Drawn
-        all at once that is roughly fifteen packages carrying structure and five hundred carrying none,
-        which is a picture of one fact rather than a tool. Per-package the data is well behaved: 99% of
-        packages have twelve or fewer neighbours.
+        Size shows dependents; colour shows requirements; hollow nodes require nothing. Arrows point
+        toward requirements. Click a package to centre it, drag to pan, and scroll to zoom.
       </p>
     </section>
 
@@ -210,8 +199,7 @@
     <section id="view-table" class="hidden" role="tabpanel" aria-labelledby="tab-table" tabindex="-1">
       <div class="card">
         <div class="cardhead"><div><h3>All packages in scope</h3>
-          <p class="cap">Every value in the dashboard is reachable here without hovering.
-            Click or press Enter on a row for detail.</p></div></div>
+          <p class="cap">Select a row for details.</p></div></div>
         <div style="overflow:auto;max-height:70vh"><table class="tv" id="allTable"></table></div>
       </div>
     </section>
@@ -219,9 +207,8 @@
     <footer class="foot">
       <p id="footGen"></p>
       <p style="margin:10px 0 0">
-        Built from the <a href="https://github.com/leanprover/reservoir-index">Reservoir index</a>
-        by <a href="https://github.com/austinletson/reservoir-stats">reservoir-stats</a>.
-        <a href="https://reservoir.lean-lang.org">Reservoir</a> is the Lean 4 package registry.
+        Built by <a href="https://github.com/austinletson/reservoir-stats">reservoir-stats</a>
+        from the <a href="https://github.com/leanprover/reservoir-index">Reservoir index</a>.
       </p>
     </footer>
   </div>
