@@ -80,8 +80,7 @@ function renderFooter() {
   const when = new Date(d.generatedAt);
   const stamp = isNaN(when) ? d.generatedAt : when.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   $("footGen").textContent =
-    `${num(PKGS.length)} packages, ${MONTHS[0]} to ${MONTHS[NM - 1]}. Data generated ${stamp} from the Reservoir index.`;
-  $("footNow").textContent = num(PKGS.length);
+    `${num(PKGS.length)} packages · ${MONTHS[0]}–${MONTHS[NM - 1]} · Updated ${stamp}`;
 }
 
 /* ================= render ================= */
@@ -145,39 +144,35 @@ function renderScopeBar(keep, w, total) {
   const sb = $("scopebar");
   sb.textContent = "";
   const strong = tag("b", "", `${num(total)} of ${num(w.size)} packages`);
-  const parts = [` in scope as of ${MONTHS[state.asof]}.`];
+  const parts = [` in scope · ${MONTHS[state.asof]}.`];
   if (state.query) {
     const m = [...keep.values()].filter((n) => matchesQuery(n.p)).length;
     const where = state.view === "graph"
-      ? "the graph dims everything else"
-      : "the charts above are not";
-    parts.push(` The table is filtered to ${plural(m, "match", "matches")} for “${state.query}”; ${where}.`);
+      ? "other graph nodes are dimmed"
+      : "charts are unchanged";
+    parts.push(` ${plural(m, "match", "matches")} for “${state.query}”; ${where}.`);
   }
   if (state.view === "graph" && state.hideOrphans) {
-    parts.push(" The graph hides packages with no edges — use the toggle to show them.");
+    parts.push(" Packages without edges are hidden.");
   }
   if (state.palomarOnly) {
     // Absence in this feed is not absence from Palomar, and a scope bar that let a reader
     // believe otherwise would be the same class of lie as the filtered-then-counted bug.
     // Deliberately no count of its own: the bold prefix already states how many packages
     // survive every filter, and a second number here would read as disagreeing with it.
-    parts.push(" Limited to packages with an entry in Palomar's recent-registrations feed."
-      + " That feed is not the whole registry, so a package missing here may still be on"
-      + " Palomar.");
+    parts.push(" Palomar's recent feed is incomplete; missing packages may still be registered.");
   }
   if (state.formalizationOnly) {
     // Self-reported, and absence of the file is not absence of a formalization. Same
     // shape of claim as the Palomar sentence above, and it has to be as explicit.
-    parts.push(` Limited to the ${num(FORMALIZATION_N)} packages with a formalization.yaml.`
-      + " Each file is the project's own claim about its own work, and most repositories"
-      + " carry no such file whatever they formalize.");
+    parts.push(` Showing ${num(FORMALIZATION_N)} packages with a self-reported formalization.yaml.`);
   }
   // Graph-only, because the graph is the only view it changes. Reads like the hide-orphans
   // sentence above it, which is the other control that edits the drawing and nothing else.
   if (state.view === "graph" && state.collapseMathlib) {
     parts.push(" Mathlib and its edges are excluded from the graph.");
   }
-  parts.push(" Dependency counts are always measured against the full graph, so filters change what you see, never what the numbers mean.");
+  parts.push(" Dependency counts always use the full graph.");
   sb.append(strong, document.createTextNode(parts.join("")));
 }
 
@@ -202,7 +197,7 @@ function renderKpis(keep, c, total, roll) {
   const ml = c.mathlib + c.mathlibplus;
   $("kMathlib").textContent = pct(roll.transitive, total) + "%";
   $("kMathlibSub").textContent =
-    `${pct(ml, total)}% directly · ${pct(roll.transitive - ml, total)}% only through something else`;
+    `${pct(ml, total)}% direct · ${pct(roll.transitive - ml, total)}% transitive`;
 
   $("kNone").textContent = pct(c.none, total) + "%";
   $("kNoneSub").textContent = plural(c.none, "package");
@@ -231,7 +226,7 @@ function renderRanking(keep, w) {
 
   $("topTitle").textContent = state.topMetric === "used" ? "Most depended-on packages" : "Fastest growing packages";
   $("topCap").textContent = state.topMetric === "used"
-    ? "Direct dependents, counted across the whole graph — not just the packages in scope."
+    ? "Direct dependents across the full graph."
     : `New dependents gained since ${MONTHS[prevT === null ? 0 : prevT]}.`;
   drawTop($("topCallout"), $("topChart"), ranked, state.topMetric, openPackage);
 }

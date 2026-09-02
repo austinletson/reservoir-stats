@@ -301,7 +301,7 @@ export function drawTop(calloutHost, host, rows, metric, onOpen) {
     c.append(
       tag("span", "nm", lead.name),
       tag("span", "big", num(lead.v)),
-      tag("span", "why", why + " — charted separately so the rest stay readable"),
+      tag("span", "why", why + " · shown separately for readability"),
     );
     c.addEventListener("click", () => onOpen(lead.id));
     calloutHost.appendChild(c);
@@ -313,7 +313,7 @@ export function drawTop(calloutHost, host, rows, metric, onOpen) {
   if (state.topForm === "table" || narrow) {
     host.textContent = "";
     if (narrow && state.topForm !== "table") {
-      host.appendChild(tag("p", "cap", "Shown as a table — the bar chart needs a wider screen."));
+      host.appendChild(tag("p", "cap", "Table shown on narrow screens."));
     }
     const tb = tag("table", "tv");
     const thead = tag("thead");
